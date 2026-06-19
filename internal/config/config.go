@@ -17,6 +17,7 @@ type Config struct {
 type ServerConfig struct {
 	Port          int    `env:"PORT,required"`
 	PrivatePort   int    `env:"PRIVATE_PORT,required"`
+	ServiceName   string `env:"SERVICE_NAME"         envDefault:"secunda-task-manager"`
 	LogLevel      string `env:"LOG_LEVEL"            envDefault:"info"`
 	LogForcePlain bool   `env:"LOG_FORCE_PLAIN_TEXT" envDefault:"false"`
 }
