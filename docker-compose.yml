@@ -1,0 +1,75 @@
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: taskmanager
+      MYSQL_USER: taskuser
+      MYSQL_PASSWORD: taskpassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "taskuser", "-ptaskpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    environment:
+      SERVER_PORT: "8080"
+      SERVER_PRIVATE_PORT: "8081"
+      SERVER_LOG_LEVEL: info
+      SERVER_LOG_FORCE_PLAIN_TEXT: "false"
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_USER: taskuser
+      MYSQL_PASSWORD: taskpassword
+      MYSQL_DBNAME: taskmanager
+      MYSQL_MAX_OPEN_CONNS: "25"
+      MYSQL_MAX_IDLE_CONNS: "5"
+      MYSQL_CONN_MAX_LIFETIME: 5m
+      MYSQL_CONN_MAX_IDLE_TIME: 1m
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ""
+      REDIS_DB: "0"
+      REDIS_POOL_SIZE: "10"
+      JWT_SECRET: change_me_in_production
+      JWT_TTL: 15m
+      JWT_REFRESH_TTL: 7d
+      APP_ALLOWED_ORIGINS: http://localhost:3000
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  mysql_data:
+  redis_data:
