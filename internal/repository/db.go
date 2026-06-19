@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -12,7 +13,7 @@ import (
 	"github.com/zoshc/secunda-task-manager/internal/config"
 )
 
-func NewMySQL(cfg config.MySQLConfig) (*sqlx.DB, error) {
+func NewMySQL(ctx context.Context, cfg config.MySQLConfig) (*sqlx.DB, error) {
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&loc=UTC&multiStatements=true",
 		cfg.User, cfg.Password, cfg.Host, cfg.Port, cfg.DBName,
 	)
@@ -27,7 +28,7 @@ func NewMySQL(cfg config.MySQLConfig) (*sqlx.DB, error) {
 	db.SetConnMaxLifetime(cfg.ConnMaxLifetime)
 	db.SetConnMaxIdleTime(cfg.ConnMaxIdleTime)
 
-	if err = db.Ping(); err != nil {
+	if err = db.PingContext(ctx); err != nil {
 		return nil, fmt.Errorf("ping mysql: %w", err)
 	}
 
