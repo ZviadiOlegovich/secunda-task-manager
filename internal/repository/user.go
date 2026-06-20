@@ -50,6 +50,25 @@ func (r *userRepository) GetByEmail(ctx context.Context, email string) (*user.Us
 	return u, nil
 }
 
+func (r *userRepository) GetByRefreshToken(ctx context.Context, token string) (*user.User, error) {
+	const q = `
+		SELECT id, email, password_hash, name, refresh_token, created_at, updated_at
+		FROM users
+		WHERE refresh_token = ?`
+	u := &user.User{}
+	err := r.db.QueryRowContext(ctx, q, token).Scan(
+		&u.ID, &u.Email, &u.PasswordHash, &u.Name,
+		&u.RefreshToken, &u.CreatedAt, &u.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errs.ErrNotFound
+		}
+		return nil, err
+	}
+	return u, nil
+}
+
 func (r *userRepository) UpdateRefreshToken(ctx context.Context, userID uint64, token string) error {
 	const q = `UPDATE users SET refresh_token = ? WHERE id = ?`
 	_, err := r.db.ExecContext(ctx, q, token, userID)

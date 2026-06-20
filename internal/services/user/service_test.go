@@ -10,9 +10,10 @@ import (
 )
 
 type mockRepo struct {
-	createFn             func(ctx context.Context, u *User) error
-	getByEmailFn         func(ctx context.Context, email string) (*User, error)
-	updateRefreshTokenFn func(ctx context.Context, userID uint64, token string) error
+	createFn              func(ctx context.Context, u *User) error
+	getByEmailFn          func(ctx context.Context, email string) (*User, error)
+	getByRefreshTokenFn   func(ctx context.Context, token string) (*User, error)
+	updateRefreshTokenFn  func(ctx context.Context, userID uint64, token string) error
 }
 
 func (m *mockRepo) Create(ctx context.Context, u *User) error {
@@ -23,13 +24,18 @@ func (m *mockRepo) GetByEmail(ctx context.Context, email string) (*User, error) 
 	return m.getByEmailFn(ctx, email)
 }
 
+func (m *mockRepo) GetByRefreshToken(ctx context.Context, token string) (*User, error) {
+	return m.getByRefreshTokenFn(ctx, token)
+}
+
 func (m *mockRepo) UpdateRefreshToken(ctx context.Context, userID uint64, token string) error {
 	return m.updateRefreshTokenFn(ctx, userID, token)
 }
 
 type mockTokens struct {
-	generateAccessFn  func(userID uint64) (string, error)
-	generateRefreshFn func(userID uint64) (string, error)
+	generateAccessFn   func(userID uint64) (string, error)
+	generateRefreshFn  func(userID uint64) (string, error)
+	validateRefreshFn  func(token string) (uint64, error)
 }
 
 func (m *mockTokens) GenerateAccess(userID uint64) (string, error) {
@@ -40,10 +46,15 @@ func (m *mockTokens) GenerateRefresh(userID uint64) (string, error) {
 	return m.generateRefreshFn(userID)
 }
 
+func (m *mockTokens) ValidateRefresh(token string) (uint64, error) {
+	return m.validateRefreshFn(token)
+}
+
 var (
 	okTokens = &mockTokens{
 		generateAccessFn:  func(_ uint64) (string, error) { return "access-token", nil },
 		generateRefreshFn: func(_ uint64) (string, error) { return "refresh-token", nil },
+		validateRefreshFn: func(_ string) (uint64, error) { return 1, nil },
 	}
 )
 

@@ -13,7 +13,11 @@ import (
 	"github.com/zoshc/secunda-task-manager/internal/closer"
 	"github.com/zoshc/secunda-task-manager/internal/config"
 	"github.com/zoshc/secunda-task-manager/internal/repository"
-	httptransport "github.com/zoshc/secunda-task-manager/internal/transport/http"
+	"github.com/zoshc/secunda-task-manager/internal/services/user"
+	"github.com/zoshc/secunda-task-manager/internal/transport/http"
+	"github.com/zoshc/secunda-task-manager/internal/transport/http/handler"
+	"github.com/zoshc/secunda-task-manager/internal/transport/http/router"
+	"github.com/zoshc/secunda-task-manager/pkg/jwt"
 	"github.com/zoshc/secunda-task-manager/pkg/logger"
 )
 
@@ -46,8 +50,13 @@ func main() {
 		return rdb.Close()
 	})
 
-	srv := httptransport.NewServer(*cfg)
-	privateSrv := httptransport.NewPrivateServer(cfg.Server.PrivatePort)
+	jwtProvider := jwt.NewProvider(cfg.JWT)
+	userRepo := repository.NewUserRepository(db)
+	userSvc := user.New(userRepo, jwtProvider)
+	authHandler := handler.NewAuthHandler(userSvc)
+
+	srv := http.NewServer(*cfg, router.NewRouter(authHandler.Router()))
+	privateSrv := http.NewPrivateServer(cfg.Server.PrivatePort)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

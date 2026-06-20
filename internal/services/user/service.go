@@ -77,6 +77,31 @@ func (s *Service) Login(ctx context.Context, input LoginInput) (*Tokens, error) 
 	return tokens, nil
 }
 
+func (s *Service) Refresh(ctx context.Context, refreshToken string) (*Tokens, error) {
+	logger := zerolog.Ctx(ctx)
+
+	if _, err := s.tokens.ValidateRefresh(refreshToken); err != nil {
+		return nil, ErrInvalidCredentials
+	}
+
+	u, err := s.repo.GetByRefreshToken(ctx, refreshToken)
+	if err != nil {
+		if errors.Is(err, errs.ErrNotFound) {
+			return nil, ErrInvalidCredentials
+		}
+		logger.Error().Err(err).Msg("get user by refresh token")
+		return nil, err
+	}
+
+	tokens, err := s.issueTokens(ctx, u.ID)
+	if err != nil {
+		logger.Error().Err(err).Msg("issue tokens")
+		return nil, err
+	}
+
+	return tokens, nil
+}
+
 func (s *Service) issueTokens(ctx context.Context, userID uint64) (*Tokens, error) {
 	accessToken, err := s.tokens.GenerateAccess(userID)
 	if err != nil {

@@ -78,3 +78,11 @@ func (p *Provider) ValidateAccess(tokenStr string) (*Claims, error) {
 	}
 	return claims, nil
 }
+
+func (p *Provider) ValidateRefresh(tokenStr string) (uint64, error) {
+	claims, err := Validate(tokenStr, p.refreshKey, p.leeway)
+	if err != nil {
+		return 0, errors.New("invalid refresh token")
+	}
+	return claims.UserID, nil
+}
