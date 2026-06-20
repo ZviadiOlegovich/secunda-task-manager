@@ -20,12 +20,21 @@ func (r *statsRepository) TeamStats(ctx context.Context) ([]stats.TeamStat, erro
 		SELECT
 			t.id,
 			t.name,
-			COUNT(DISTINCT tm.user_id) AS member_count,
-			COUNT(DISTINCT CASE WHEN ta.status = 'done' AND ta.updated_at >= NOW() - INTERVAL 7 DAY THEN ta.id END) AS done_last_week
+			COALESCE(m.member_count, 0)   AS member_count,
+			COALESCE(d.done_last_week, 0) AS done_last_week
 		FROM teams t
-		LEFT JOIN team_members tm ON tm.team_id = t.id
-		LEFT JOIN tasks        ta ON ta.team_id = t.id
-		GROUP BY t.id, t.name
+		LEFT JOIN (
+			SELECT team_id, COUNT(*) AS member_count
+			FROM team_members
+			GROUP BY team_id
+		) m ON m.team_id = t.id
+		LEFT JOIN (
+			SELECT team_id, COUNT(*) AS done_last_week
+			FROM tasks
+			WHERE status = 'done'
+			  AND updated_at >= NOW() - INTERVAL 7 DAY
+			GROUP BY team_id
+		) d ON d.team_id = t.id
 		ORDER BY t.id`
 
 	rows, err := r.db.QueryContext(ctx, q)
