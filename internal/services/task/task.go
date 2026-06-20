@@ -13,6 +13,14 @@ const (
 	StatusDone       TaskStatus = "done"
 )
 
+func (s TaskStatus) isValid() bool {
+	switch s {
+	case StatusTodo, StatusInProgress, StatusDone:
+		return true
+	}
+	return false
+}
+
 type TaskPriority string
 
 const (
@@ -109,4 +117,54 @@ type ListFilter struct {
 	AssigneeID  *int64
 	Page        int
 	Limit       int
+}
+
+type UpdateTaskInput struct {
+	TaskID    int64
+	TeamID    int64
+	UpdatedBy int64
+
+	Title       string
+	Description *string
+	Status      TaskStatus
+	Priority    TaskPriority
+	Estimate    *TaskEstimate
+	AssigneeID  *int64
+	DueDate     *time.Time
+}
+
+func (i *UpdateTaskInput) applyDefaults() {
+	i.Title = strings.TrimSpace(i.Title)
+}
+
+func (i *UpdateTaskInput) participantIDs(existingAssigneeID *int64) []int64 {
+	ids := []int64{i.UpdatedBy}
+	if i.AssigneeID != nil && !ptrEqual(existingAssigneeID, i.AssigneeID) {
+		ids = append(ids, *i.AssigneeID)
+	}
+	return ids
+}
+
+func (i *UpdateTaskInput) validate() error {
+	if i.Title == "" {
+		return ErrInvalidTitle
+	}
+	if !i.Status.isValid() {
+		return ErrInvalidStatus
+	}
+	if !i.Priority.isValid() {
+		return ErrInvalidPriority
+	}
+	if i.Estimate != nil && !(*i.Estimate).isValid() {
+		return ErrInvalidEstimate
+	}
+	return nil
+}
+
+type TaskHistoryEntry struct {
+	TaskID   int64
+	UserID   int64
+	Field    string
+	OldValue *string
+	NewValue *string
 }

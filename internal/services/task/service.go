@@ -55,6 +55,42 @@ func (s *Service) CreateTask(ctx context.Context, create CreateTaskInput) (*Task
 	return t, nil
 }
 
+func (s *Service) UpdateTask(ctx context.Context, update UpdateTaskInput) error {
+	logger := zerolog.Ctx(ctx)
+
+	update.applyDefaults()
+	if err := update.validate(); err != nil {
+		return err
+	}
+
+	existing, err := s.repo.GetByID(ctx, update.TaskID)
+	if err != nil {
+		return err
+	}
+	if existing.TeamID != update.TeamID {
+		return errs.ErrNotFound
+	}
+
+	if err := s.teamRepo.AreMembersOf(ctx, update.TeamID, update.participantIDs(existing.AssigneeID)); err != nil {
+		if errors.Is(err, errs.ErrNotFound) {
+			return ErrNotMember
+		}
+		logger.Error().Err(err).Msg("check membership")
+		return err
+	}
+
+	updated, history := applyUpdate(existing, update)
+	if len(history) == 0 {
+		return nil
+	}
+
+	if err := s.repo.UpdateWithHistory(ctx, updated, history); err != nil {
+		logger.Error().Err(err).Msg("update task")
+		return err
+	}
+	return nil
+}
+
 func (s *Service) ListTasks(ctx context.Context, filter ListFilter) ([]*Task, error) {
 	logger := zerolog.Ctx(ctx)
 

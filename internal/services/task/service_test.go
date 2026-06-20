@@ -9,10 +9,10 @@ import (
 )
 
 type mockRepo struct {
-	createFn  func(ctx context.Context, task *Task) (int64, error)
-	getByIDFn func(ctx context.Context, id int64) (*Task, error)
-	updateFn  func(ctx context.Context, task *Task) error
-	listFn    func(ctx context.Context, filter ListFilter) ([]*Task, error)
+	createFn            func(ctx context.Context, task *Task) (int64, error)
+	getByIDFn           func(ctx context.Context, id int64) (*Task, error)
+	updateWithHistoryFn func(ctx context.Context, task *Task, history []TaskHistoryEntry) error
+	listFn              func(ctx context.Context, filter ListFilter) ([]*Task, error)
 }
 
 func (m *mockRepo) Create(ctx context.Context, t *Task) (int64, error) {
@@ -23,8 +23,8 @@ func (m *mockRepo) GetByID(ctx context.Context, id int64) (*Task, error) {
 	return m.getByIDFn(ctx, id)
 }
 
-func (m *mockRepo) Update(ctx context.Context, t *Task) error {
-	return m.updateFn(ctx, t)
+func (m *mockRepo) UpdateWithHistory(ctx context.Context, t *Task, history []TaskHistoryEntry) error {
+	return m.updateWithHistoryFn(ctx, t, history)
 }
 
 func (m *mockRepo) List(ctx context.Context, f ListFilter) ([]*Task, error) {
@@ -194,6 +194,123 @@ func TestService_CreateTask(t *testing.T) {
 			}
 			if tt.wantErr == nil && task == nil {
 				t.Error("expected task, got nil")
+			}
+		})
+	}
+}
+
+func taskForUpdate(createdBy int64) *Task {
+	return &Task{ID: 10, TeamID: 1, Title: "old", Status: StatusTodo, Priority: PriorityMedium, CreatedBy: createdBy}
+}
+
+func updateRepo(task *Task) *mockRepo {
+	return &mockRepo{
+		getByIDFn:           func(_ context.Context, _ int64) (*Task, error) { return task, nil },
+		updateWithHistoryFn: func(_ context.Context, _ *Task, _ []TaskHistoryEntry) error { return nil },
+	}
+}
+
+func TestService_UpdateTask(t *testing.T) {
+	assigneeID := int64(5)
+	otherAssignee := int64(99)
+
+	validInput := func(updatedBy int64) UpdateTaskInput {
+		return UpdateTaskInput{TaskID: 10, TeamID: 1, UpdatedBy: updatedBy, Title: "new title", Status: StatusTodo, Priority: PriorityMedium}
+	}
+
+	tests := []struct {
+		name     string
+		input    UpdateTaskInput
+		repo     Repository
+		teamRepo TeamRepository
+		wantErr  error
+	}{
+		{
+			name:     "member updates any task",
+			input:    validInput(99),
+			repo:     updateRepo(taskForUpdate(1)),
+			teamRepo: memberTeamRepo,
+		},
+		{
+			name:     "user not in team",
+			input:    validInput(99),
+			repo:     updateRepo(taskForUpdate(1)),
+			teamRepo: notMemberTeamRepo,
+			wantErr:  ErrNotMember,
+		},
+		{
+			name: "task belongs to different team",
+			input: UpdateTaskInput{TaskID: 10, TeamID: 2, UpdatedBy: 1, Title: "new", Status: StatusTodo, Priority: PriorityMedium},
+			repo: &mockRepo{
+				getByIDFn:           func(_ context.Context, _ int64) (*Task, error) { return taskForUpdate(1), nil },
+				updateWithHistoryFn: func(_ context.Context, _ *Task, _ []TaskHistoryEntry) error { return nil },
+			},
+			teamRepo: memberTeamRepo,
+			wantErr:  errs.ErrNotFound,
+		},
+		{
+			name:  "no-op update skips DB write",
+			input: UpdateTaskInput{TaskID: 10, TeamID: 1, UpdatedBy: 1, Title: "old", Status: StatusTodo, Priority: PriorityMedium},
+			repo: &mockRepo{
+				getByIDFn: func(_ context.Context, _ int64) (*Task, error) { return taskForUpdate(1), nil },
+				updateWithHistoryFn: func(_ context.Context, _ *Task, _ []TaskHistoryEntry) error {
+					t.Error("UpdateWithHistory should not be called for no-op")
+					return nil
+				},
+			},
+			teamRepo: memberTeamRepo,
+		},
+		{
+			name:     "status update",
+			input:    UpdateTaskInput{TaskID: 10, TeamID: 1, UpdatedBy: 1, Title: "old", Status: StatusInProgress, Priority: PriorityMedium},
+			repo:     updateRepo(taskForUpdate(1)),
+			teamRepo: memberTeamRepo,
+		},
+		{
+			name: "assignee changed to non-member returns ErrNotMember",
+			input: UpdateTaskInput{TaskID: 10, TeamID: 1, UpdatedBy: 1, Title: "old", Status: StatusTodo, Priority: PriorityMedium, AssigneeID: &otherAssignee},
+			repo: &mockRepo{
+				getByIDFn:           func(_ context.Context, _ int64) (*Task, error) { return taskForUpdate(1), nil },
+				updateWithHistoryFn: func(_ context.Context, _ *Task, _ []TaskHistoryEntry) error { return nil },
+			},
+			teamRepo: notMemberTeamRepo,
+			wantErr:  ErrNotMember,
+		},
+		{
+			name: "assignee unchanged — no extra membership check",
+			input: UpdateTaskInput{TaskID: 10, TeamID: 1, UpdatedBy: 1, Title: "new title", Status: StatusTodo, Priority: PriorityMedium, AssigneeID: &assigneeID},
+			repo: &mockRepo{
+				getByIDFn: func(_ context.Context, _ int64) (*Task, error) {
+					t := taskForUpdate(1)
+					t.AssigneeID = &assigneeID
+					return t, nil
+				},
+				updateWithHistoryFn: func(_ context.Context, _ *Task, _ []TaskHistoryEntry) error { return nil },
+			},
+			teamRepo: memberTeamRepo,
+		},
+		{
+			name:     "blank title",
+			input:    UpdateTaskInput{TaskID: 10, TeamID: 1, UpdatedBy: 1, Title: "  ", Status: StatusTodo, Priority: PriorityMedium},
+			repo:     updateRepo(taskForUpdate(1)),
+			teamRepo: memberTeamRepo,
+			wantErr:  ErrInvalidTitle,
+		},
+		{
+			name:     "invalid status",
+			input:    UpdateTaskInput{TaskID: 10, TeamID: 1, UpdatedBy: 1, Title: "ok", Status: TaskStatus("unknown"), Priority: PriorityMedium},
+			repo:     updateRepo(taskForUpdate(1)),
+			teamRepo: memberTeamRepo,
+			wantErr:  ErrInvalidStatus,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := New(tt.repo, tt.teamRepo)
+			err := svc.UpdateTask(context.Background(), tt.input)
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("want %v, got %v", tt.wantErr, err)
 			}
 		})
 	}

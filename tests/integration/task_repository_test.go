@@ -209,7 +209,11 @@ func TestTaskRepository_Update(t *testing.T) {
 	got.Status = task.StatusDone
 	got.Priority = task.PriorityHigh
 
-	if err := repo.Update(ctx, got); err != nil {
+	history := []task.TaskHistoryEntry{
+		{TaskID: id, UserID: userID, Field: "title", OldValue: strPtr("Old title"), NewValue: strPtr("New title")},
+		{TaskID: id, UserID: userID, Field: "status", OldValue: strPtr("todo"), NewValue: strPtr("done")},
+	}
+	if err := repo.UpdateWithHistory(ctx, got, history); err != nil {
 		t.Fatalf("update: %v", err)
 	}
 
@@ -296,3 +300,5 @@ func TestTaskRepository_List(t *testing.T) {
 		}
 	})
 }
+
+func strPtr(s string) *string { return &s }

@@ -48,13 +48,44 @@ func (r *taskRepository) GetByID(ctx context.Context, id int64) (*task.Task, err
 	return t, nil
 }
 
-func (r *taskRepository) Update(ctx context.Context, t *task.Task) error {
-	const q = `UPDATE tasks SET title = ?, description = ?, status = ?, priority = ?, estimate = ?, assignee_id = ?, due_date = ?
-		WHERE id = ?`
-	_, err := r.db.ExecContext(ctx, q,
-		t.Title, t.Description, t.Status, t.Priority, t.Estimate, t.AssigneeID, t.DueDate, t.ID,
+func (r *taskRepository) UpdateWithHistory(ctx context.Context, t *task.Task, history []task.TaskHistoryEntry) error {
+	if len(history) == 0 {
+		return nil
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	_, err = tx.ExecContext(ctx,
+		`UPDATE tasks SET title = ?, description = ?, status = ?, priority = ?, estimate = ?, assignee_id = ?, due_date = ? WHERE id = ? AND team_id = ?`,
+		t.Title, t.Description, t.Status, t.Priority, t.Estimate, t.AssigneeID, t.DueDate, t.ID, t.TeamID,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+
+	var b strings.Builder
+	b.Grow(12 * len(history))
+	args := make([]any, 0, len(history)*5)
+	for i, h := range history {
+		if i > 0 {
+			b.WriteByte(',')
+		}
+		b.WriteString("(?,?,?,?,?)")
+		args = append(args, h.TaskID, h.UserID, h.Field, h.OldValue, h.NewValue)
+	}
+	_, err = tx.ExecContext(ctx,
+		`INSERT INTO task_history (task_id, user_id, field, old_value, new_value) VALUES `+b.String(),
+		args...,
+	)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func (r *taskRepository) List(ctx context.Context, filter task.ListFilter) ([]*task.Task, error) {

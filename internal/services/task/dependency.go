@@ -5,7 +5,7 @@ import "context"
 type Repository interface {
 	Create(ctx context.Context, task *Task) (int64, error)
 	GetByID(ctx context.Context, id int64) (*Task, error)
-	Update(ctx context.Context, task *Task) error
+	UpdateWithHistory(ctx context.Context, task *Task, history []TaskHistoryEntry) error
 	List(ctx context.Context, filter ListFilter) ([]*Task, error)
 }
 
