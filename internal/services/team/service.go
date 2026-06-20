@@ -78,6 +78,15 @@ func (s *Service) InviteUser(ctx context.Context, invite InviteUserInput) error 
 	return nil
 }
 
+func (s *Service) ListTeams(ctx context.Context, userID int64) ([]*Team, error) {
+	teams, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		zerolog.Ctx(ctx).Error().Err(err).Msg("list teams")
+		return nil, err
+	}
+	return teams, nil
+}
+
 func canInvite(inviterRole, targetRole Role) bool {
 	switch inviterRole {
 	case RoleOwner:

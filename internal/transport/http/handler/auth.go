@@ -4,8 +4,9 @@ import (
 	"context"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/zoshc/secunda-task-manager/internal/apierr"
+	"github.com/zoshc/secunda-task-manager/internal/transport/http/apierr"
 	"github.com/zoshc/secunda-task-manager/internal/services/user"
+	"github.com/zoshc/secunda-task-manager/internal/transport/http/handler/model"
 	"github.com/zoshc/secunda-task-manager/internal/transport/http/router"
 )
 
@@ -32,14 +33,8 @@ func NewAuthHandler(svc AuthService) *authHandler {
 
 func (h *authHandler) Router() router.MakeRouter { return h.makeRouter }
 
-type registerRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	Name     string `json:"name"`
-}
-
 func (h *authHandler) register(c *fiber.Ctx) error {
-	var req registerRequest
+	var req model.RegisterRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 	}
@@ -55,13 +50,8 @@ func (h *authHandler) register(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusCreated)
 }
 
-type loginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
 func (h *authHandler) login(c *fiber.Ctx) error {
-	var req loginRequest
+	var req model.LoginRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 	}
@@ -74,18 +64,14 @@ func (h *authHandler) login(c *fiber.Ctx) error {
 		return apierr.Response(c, err)
 	}
 
-	return c.JSON(fiber.Map{
-		"access_token":  tokens.Access,
-		"refresh_token": tokens.Refresh,
+	return c.JSON(model.TokensResponse{
+		AccessToken:  tokens.Access,
+		RefreshToken: tokens.Refresh,
 	})
 }
 
-type refreshRequest struct {
-	RefreshToken string `json:"refresh_token"`
-}
-
 func (h *authHandler) refresh(c *fiber.Ctx) error {
-	var req refreshRequest
+	var req model.RefreshRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 	}
@@ -99,8 +85,8 @@ func (h *authHandler) refresh(c *fiber.Ctx) error {
 		return apierr.Response(c, err)
 	}
 
-	return c.JSON(fiber.Map{
-		"access_token":  tokens.Access,
-		"refresh_token": tokens.Refresh,
+	return c.JSON(model.TokensResponse{
+		AccessToken:  tokens.Access,
+		RefreshToken: tokens.Refresh,
 	})
 }

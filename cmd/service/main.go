@@ -13,7 +13,9 @@ import (
 	"github.com/zoshc/secunda-task-manager/internal/closer"
 	"github.com/zoshc/secunda-task-manager/internal/config"
 	"github.com/zoshc/secunda-task-manager/internal/repository"
+	"github.com/zoshc/secunda-task-manager/internal/services/team"
 	"github.com/zoshc/secunda-task-manager/internal/services/user"
+	"github.com/zoshc/secunda-task-manager/internal/transport/http/middleware"
 	"github.com/zoshc/secunda-task-manager/internal/transport/http"
 	"github.com/zoshc/secunda-task-manager/internal/transport/http/handler"
 	"github.com/zoshc/secunda-task-manager/internal/transport/http/router"
@@ -51,11 +53,20 @@ func main() {
 	})
 
 	jwtProvider := jwt.NewProvider(cfg.JWT)
+	authMiddleware := middleware.Auth(jwtProvider)
+
 	userRepo := repository.NewUserRepository(db)
 	userSvc := user.New(userRepo, jwtProvider)
 	authHandler := handler.NewAuthHandler(userSvc)
 
-	srv := http.NewServer(*cfg, router.NewRouter(authHandler.Router()))
+	teamRepo := repository.NewTeamRepository(db)
+	teamSvc := team.New(teamRepo)
+	teamHandler := handler.NewTeamHandler(authMiddleware, teamSvc)
+
+	srv := http.NewServer(*cfg,
+		router.NewRouter(authHandler.Router()),
+		router.NewRouter(teamHandler.Router()),
+	)
 	privateSrv := http.NewPrivateServer(cfg.Server.PrivatePort)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
