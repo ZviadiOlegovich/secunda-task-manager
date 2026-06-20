@@ -51,6 +51,69 @@ var notMemberTeamRepo = &mockTeamRepo{
 	areMembersOfFn: func(_ context.Context, _ int64, _ []int64) error { return errs.ErrNotFound },
 }
 
+func TestService_ListTasks(t *testing.T) {
+	status := StatusTodo
+	tasks := []*Task{
+		{ID: 1, TeamID: 1, Title: "A", Status: StatusTodo, Priority: PriorityMedium},
+		{ID: 2, TeamID: 1, Title: "B", Status: StatusDone, Priority: PriorityHigh},
+	}
+
+	okListRepo := &mockRepo{
+		listFn: func(_ context.Context, _ ListFilter) ([]*Task, error) { return tasks, nil },
+	}
+
+	tests := []struct {
+		name     string
+		input    ListFilter
+		repo     Repository
+		teamRepo TeamRepository
+		wantLen  int
+		wantErr  error
+	}{
+		{
+			name:     "success",
+			input:    ListFilter{TeamID: 1, RequestedBy: 1, Page: 1, Limit: 20},
+			repo:     okListRepo,
+			teamRepo: memberTeamRepo,
+			wantLen:  2,
+		},
+		{
+			name:     "not a member",
+			input:    ListFilter{TeamID: 1, RequestedBy: 1, Page: 1, Limit: 20},
+			repo:     okListRepo,
+			teamRepo: notMemberTeamRepo,
+			wantErr:  ErrNotMember,
+		},
+		{
+			name: "with status filter",
+			input: ListFilter{TeamID: 1, RequestedBy: 1, Status: &status, Page: 1, Limit: 20},
+			repo: &mockRepo{
+				listFn: func(_ context.Context, f ListFilter) ([]*Task, error) {
+					if f.Status == nil || *f.Status != StatusTodo {
+						return nil, errors.New("unexpected filter")
+					}
+					return tasks[:1], nil
+				},
+			},
+			teamRepo: memberTeamRepo,
+			wantLen:  1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := New(tt.repo, tt.teamRepo)
+			got, err := svc.ListTasks(context.Background(), tt.input)
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("want %v, got %v", tt.wantErr, err)
+			}
+			if tt.wantErr == nil && len(got) != tt.wantLen {
+				t.Errorf("want %d tasks, got %d", tt.wantLen, len(got))
+			}
+		})
+	}
+}
+
 func TestService_CreateTask(t *testing.T) {
 	assigneeID := int64(2)
 

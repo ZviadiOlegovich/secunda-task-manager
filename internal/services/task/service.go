@@ -54,3 +54,22 @@ func (s *Service) CreateTask(ctx context.Context, create CreateTaskInput) (*Task
 	t.ID = id
 	return t, nil
 }
+
+func (s *Service) ListTasks(ctx context.Context, filter ListFilter) ([]*Task, error) {
+	logger := zerolog.Ctx(ctx)
+
+	if err := s.teamRepo.AreMembersOf(ctx, filter.TeamID, []int64{filter.RequestedBy}); err != nil {
+		if errors.Is(err, errs.ErrNotFound) {
+			return nil, ErrNotMember
+		}
+		logger.Error().Err(err).Msg("check membership")
+		return nil, err
+	}
+
+	tasks, err := s.repo.List(ctx, filter)
+	if err != nil {
+		logger.Error().Err(err).Msg("list tasks")
+		return nil, err
+	}
+	return tasks, nil
+}

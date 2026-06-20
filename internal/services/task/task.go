@@ -80,14 +80,6 @@ func (i *CreateTaskInput) applyDefaults() {
 	}
 }
 
-func (i *CreateTaskInput) participantIDs() []int64 {
-	ids := []int64{i.CreatedBy}
-	if i.AssigneeID != nil && *i.AssigneeID != i.CreatedBy {
-		ids = append(ids, *i.AssigneeID)
-	}
-	return ids
-}
-
 func (i *CreateTaskInput) validate() error {
 	if i.Title == "" {
 		return ErrInvalidTitle
@@ -99,4 +91,22 @@ func (i *CreateTaskInput) validate() error {
 		return ErrInvalidEstimate
 	}
 	return nil
+}
+
+func (i *CreateTaskInput) participantIDs() []int64 {
+	ids := []int64{i.CreatedBy}
+	if i.AssigneeID != nil && *i.AssigneeID != i.CreatedBy {
+		ids = append(ids, *i.AssigneeID)
+	}
+	return ids
+}
+
+type ListFilter struct {
+	TeamID      int64
+	RequestedBy int64
+	Status      *TaskStatus
+	Priority    *TaskPriority
+	AssigneeID  *int64
+	Page        int
+	Limit       int
 }
