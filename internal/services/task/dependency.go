@@ -7,6 +7,7 @@ type Repository interface {
 	GetByID(ctx context.Context, id int64) (*Task, error)
 	UpdateWithHistory(ctx context.Context, task *Task, history []TaskHistoryEntry) error
 	List(ctx context.Context, filter ListFilter) ([]*Task, error)
+	ListHistory(ctx context.Context, taskID int64) ([]HistoryRecord, error)
 }
 
 type TeamRepository interface {

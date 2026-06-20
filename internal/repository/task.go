@@ -91,9 +91,15 @@ func (r *taskRepository) UpdateWithHistory(ctx context.Context, t *task.Task, hi
 func (r *taskRepository) List(ctx context.Context, filter task.ListFilter) ([]*task.Task, error) {
 	wb := newWhereBuilder(4) // 1 обязательный + 3 опциональных
 	wb.add("team_id = ?", filter.TeamID)
-	if filter.Status != nil     { wb.add("status = ?", *filter.Status) }
-	if filter.Priority != nil   { wb.add("priority = ?", *filter.Priority) }
-	if filter.AssigneeID != nil { wb.add("assignee_id = ?", *filter.AssigneeID) }
+	if filter.Status != nil {
+		wb.add("status = ?", *filter.Status)
+	}
+	if filter.Priority != nil {
+		wb.add("priority = ?", *filter.Priority)
+	}
+	if filter.AssigneeID != nil {
+		wb.add("assignee_id = ?", *filter.AssigneeID)
+	}
 
 	limit := filter.Limit
 	if limit <= 0 {
@@ -131,23 +137,25 @@ func (r *taskRepository) List(ctx context.Context, filter task.ListFilter) ([]*t
 	return tasks, rows.Err()
 }
 
-type whereBuilder struct {
-	clauses []string
-	args    []any
-}
+func (r *taskRepository) ListHistory(ctx context.Context, taskID int64) ([]task.HistoryRecord, error) {
+	const q = `SELECT h.id, h.task_id, h.user_id, u.name, h.field, h.old_value, h.new_value, h.created_at
+		FROM task_history h
+		JOIN users u ON u.id = h.user_id
+		WHERE h.task_id = ? ORDER BY h.created_at ASC`
 
-func newWhereBuilder(cap int) *whereBuilder {
-	return &whereBuilder{
-		clauses: make([]string, 0, cap),
-		args:    make([]any, 0, cap),
+	rows, err := r.db.QueryContext(ctx, q, taskID)
+	if err != nil {
+		return nil, err
 	}
-}
+	defer rows.Close()
 
-func (b *whereBuilder) add(clause string, arg any) {
-	b.clauses = append(b.clauses, clause)
-	b.args = append(b.args, arg)
-}
-
-func (b *whereBuilder) clause() string {
-	return strings.Join(b.clauses, " AND ")
+	var records []task.HistoryRecord
+	for rows.Next() {
+		var h task.HistoryRecord
+		if err := rows.Scan(&h.ID, &h.TaskID, &h.UserID, &h.UserName, &h.Field, &h.OldValue, &h.NewValue, &h.CreatedAt); err != nil {
+			return nil, err
+		}
+		records = append(records, h)
+	}
+	return records, rows.Err()
 }

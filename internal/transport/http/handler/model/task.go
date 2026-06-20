@@ -42,6 +42,30 @@ type TaskResponse struct {
 	UpdatedAt   time.Time          `json:"updated_at"`
 }
 
+type HistoryRecordResponse struct {
+	ID        int64     `json:"id"`
+	TaskID    int64     `json:"task_id"`
+	UserID    int64     `json:"user_id"`
+	UserName  string    `json:"user_name"`
+	Field     string    `json:"field"`
+	OldValue  *string   `json:"old_value"`
+	NewValue  *string   `json:"new_value"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func ToHistoryRecordResponse(h task.HistoryRecord) HistoryRecordResponse {
+	return HistoryRecordResponse{
+		ID:        h.ID,
+		TaskID:    h.TaskID,
+		UserID:    h.UserID,
+		UserName:  h.UserName,
+		Field:     h.Field,
+		OldValue:  h.OldValue,
+		NewValue:  h.NewValue,
+		CreatedAt: h.CreatedAt,
+	}
+}
+
 func ToTaskResponse(t *task.Task) TaskResponse {
 	return TaskResponse{
 		ID:          t.ID,

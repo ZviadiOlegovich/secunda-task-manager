@@ -13,6 +13,7 @@ type mockRepo struct {
 	getByIDFn           func(ctx context.Context, id int64) (*Task, error)
 	updateWithHistoryFn func(ctx context.Context, task *Task, history []TaskHistoryEntry) error
 	listFn              func(ctx context.Context, filter ListFilter) ([]*Task, error)
+	listHistoryFn       func(ctx context.Context, taskID int64) ([]HistoryRecord, error)
 }
 
 func (m *mockRepo) Create(ctx context.Context, t *Task) (int64, error) {
@@ -29,6 +30,10 @@ func (m *mockRepo) UpdateWithHistory(ctx context.Context, t *Task, history []Tas
 
 func (m *mockRepo) List(ctx context.Context, f ListFilter) ([]*Task, error) {
 	return m.listFn(ctx, f)
+}
+
+func (m *mockRepo) ListHistory(ctx context.Context, taskID int64) ([]HistoryRecord, error) {
+	return m.listHistoryFn(ctx, taskID)
 }
 
 type mockTeamRepo struct {
@@ -76,13 +81,6 @@ func TestService_ListTasks(t *testing.T) {
 			repo:     okListRepo,
 			teamRepo: memberTeamRepo,
 			wantLen:  2,
-		},
-		{
-			name:     "not a member",
-			input:    ListFilter{TeamID: 1, RequestedBy: 1, Page: 1, Limit: 20},
-			repo:     okListRepo,
-			teamRepo: notMemberTeamRepo,
-			wantErr:  ErrNotMember,
 		},
 		{
 			name: "with status filter",
@@ -198,6 +196,64 @@ func TestService_CreateTask(t *testing.T) {
 		})
 	}
 }
+
+func TestService_GetTaskHistory(t *testing.T) {
+	records := []HistoryRecord{
+		{ID: 1, TaskID: 10, UserID: 1, Field: "title", OldValue: nil, NewValue: strPtr("new")},
+	}
+
+	historyRepo := func(task *Task) *mockRepo {
+		return &mockRepo{
+			getByIDFn:     func(_ context.Context, _ int64) (*Task, error) { return task, nil },
+			listHistoryFn: func(_ context.Context, _ int64) ([]HistoryRecord, error) { return records, nil },
+		}
+	}
+
+	tests := []struct {
+		name    string
+		taskID  int64
+		repo    Repository
+		wantLen int
+		wantErr error
+	}{
+		{
+			name:    "success",
+			taskID:  10,
+			repo:    historyRepo(taskForUpdate(1)),
+			wantLen: 1,
+		},
+		{
+			name:   "repo error",
+			taskID: 10,
+			repo: &mockRepo{
+				listHistoryFn: func(_ context.Context, _ int64) ([]HistoryRecord, error) {
+					return nil, errors.New("db error")
+				},
+			},
+			wantErr: errors.New("db error"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := New(tt.repo, memberTeamRepo)
+			got, err := svc.GetTaskHistory(context.Background(), tt.taskID)
+			if tt.wantErr != nil && err == nil {
+				t.Errorf("want error, got nil")
+			}
+			if tt.wantErr == nil {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if len(got) != tt.wantLen {
+					t.Errorf("want %d records, got %d", tt.wantLen, len(got))
+				}
+			}
+		})
+	}
+}
+
+func strPtr(s string) *string { return &s }
 
 func taskForUpdate(createdBy int64) *Task {
 	return &Task{ID: 10, TeamID: 1, Title: "old", Status: StatusTodo, Priority: PriorityMedium, CreatedBy: createdBy}

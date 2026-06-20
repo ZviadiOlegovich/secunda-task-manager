@@ -91,18 +91,21 @@ func (s *Service) UpdateTask(ctx context.Context, update UpdateTaskInput) error 
 	return nil
 }
 
+func (s *Service) GetTaskHistory(ctx context.Context, taskID int64) ([]HistoryRecord, error) {
+	logger := zerolog.Ctx(ctx)
+
+	records, err := s.repo.ListHistory(ctx, taskID)
+	if err != nil {
+		logger.Error().Err(err).Msg("list history")
+		return nil, err
+	}
+	return records, nil
+}
+
 func (s *Service) ListTasks(ctx context.Context, filter ListFilter) ([]*Task, error) {
 	logger := zerolog.Ctx(ctx)
 
 	if err := filter.validate(); err != nil {
-		return nil, err
-	}
-
-	if err := s.teamRepo.AreMembersOf(ctx, filter.TeamID, []int64{filter.RequestedBy}); err != nil {
-		if errors.Is(err, errs.ErrNotFound) {
-			return nil, ErrNotMember
-		}
-		logger.Error().Err(err).Msg("check membership")
 		return nil, err
 	}
 

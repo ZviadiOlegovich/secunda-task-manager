@@ -178,3 +178,14 @@ type TaskHistoryEntry struct {
 	OldValue *string
 	NewValue *string
 }
+
+type HistoryRecord struct {
+	ID        int64
+	TaskID    int64
+	UserID    int64
+	UserName  string
+	Field     string
+	OldValue  *string
+	NewValue  *string
+	CreatedAt time.Time
+}

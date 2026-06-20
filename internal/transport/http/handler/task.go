@@ -16,6 +16,7 @@ type TaskService interface {
 	CreateTask(ctx context.Context, create task.CreateTaskInput) (*task.Task, error)
 	ListTasks(ctx context.Context, filter task.ListFilter) ([]*task.Task, error)
 	UpdateTask(ctx context.Context, update task.UpdateTaskInput) error
+	GetTaskHistory(ctx context.Context, taskID int64) ([]task.HistoryRecord, error)
 }
 
 type taskHandler struct {
@@ -30,6 +31,7 @@ func NewTaskHandler(auth fiber.Handler, svc TaskService) *taskHandler {
 		g.Post("/", h.create)
 		g.Get("/", h.list)
 		g.Put("/:id", h.update)
+		g.Get("/:id/history", h.history)
 	}
 	return h
 }
@@ -106,6 +108,24 @@ func (h *taskHandler) list(c *fiber.Ctx) error {
 	resp := make([]model.TaskResponse, len(tasks))
 	for i, t := range tasks {
 		resp[i] = model.ToTaskResponse(t)
+	}
+	return c.JSON(resp)
+}
+
+func (h *taskHandler) history(c *fiber.Ctx) error {
+	taskID, err := strconv.ParseInt(c.Params("id"), 10, 64)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid task id"})
+	}
+
+	records, err := h.svc.GetTaskHistory(c.UserContext(), taskID)
+	if err != nil {
+		return apierr.Response(c, err)
+	}
+
+	resp := make([]model.HistoryRecordResponse, len(records))
+	for i, r := range records {
+		resp[i] = model.ToHistoryRecordResponse(r)
 	}
 	return c.JSON(resp)
 }
