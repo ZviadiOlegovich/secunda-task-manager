@@ -30,7 +30,7 @@ func Auth(validator TokenValidator) fiber.Handler {
 	}
 }
 
-func UserIDFromCtx(c *fiber.Ctx) (uint64, bool) {
-	id, ok := c.Locals(userIDKey).(uint64)
+func UserIDFromCtx(c *fiber.Ctx) (int64, bool) {
+	id, ok := c.Locals(userIDKey).(int64)
 	return id, ok
 }

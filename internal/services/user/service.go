@@ -102,7 +102,7 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (*Tokens, er
 	return tokens, nil
 }
 
-func (s *Service) issueTokens(ctx context.Context, userID uint64) (*Tokens, error) {
+func (s *Service) issueTokens(ctx context.Context, userID int64) (*Tokens, error) {
 	accessToken, err := s.tokens.GenerateAccess(userID)
 	if err != nil {
 		return nil, err

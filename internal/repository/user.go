@@ -69,7 +69,7 @@ func (r *userRepository) GetByRefreshToken(ctx context.Context, token string) (*
 	return u, nil
 }
 
-func (r *userRepository) UpdateRefreshToken(ctx context.Context, userID uint64, token string) error {
+func (r *userRepository) UpdateRefreshToken(ctx context.Context, userID int64, token string) error {
 	const q = `UPDATE users SET refresh_token = ? WHERE id = ?`
 	_, err := r.db.ExecContext(ctx, q, token, userID)
 	return err

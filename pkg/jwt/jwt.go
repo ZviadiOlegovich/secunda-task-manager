@@ -10,11 +10,11 @@ import (
 )
 
 type Claims struct {
-	UserID uint64 `json:"user_id"`
+	UserID int64 `json:"user_id"`
 	jwt.RegisteredClaims
 }
 
-func Generate(userID uint64, issuer, key string, ttl time.Duration) (string, error) {
+func Generate(userID int64, issuer, key string, ttl time.Duration) (string, error) {
 	claims := Claims{
 		UserID: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -63,11 +63,11 @@ func NewProvider(cfg config.JWTConfig) *Provider {
 	}
 }
 
-func (p *Provider) GenerateAccess(userID uint64) (string, error) {
+func (p *Provider) GenerateAccess(userID int64) (string, error) {
 	return Generate(userID, p.issuer, p.accessKey, p.accessTTL)
 }
 
-func (p *Provider) GenerateRefresh(userID uint64) (string, error) {
+func (p *Provider) GenerateRefresh(userID int64) (string, error) {
 	return Generate(userID, p.issuer, p.refreshKey, p.refreshTTL)
 }
 
@@ -79,7 +79,7 @@ func (p *Provider) ValidateAccess(tokenStr string) (*Claims, error) {
 	return claims, nil
 }
 
-func (p *Provider) ValidateRefresh(tokenStr string) (uint64, error) {
+func (p *Provider) ValidateRefresh(tokenStr string) (int64, error) {
 	claims, err := Validate(tokenStr, p.refreshKey, p.leeway)
 	if err != nil {
 		return 0, errors.New("invalid refresh token")

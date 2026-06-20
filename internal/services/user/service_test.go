@@ -13,7 +13,7 @@ type mockRepo struct {
 	createFn              func(ctx context.Context, u *User) error
 	getByEmailFn          func(ctx context.Context, email string) (*User, error)
 	getByRefreshTokenFn   func(ctx context.Context, token string) (*User, error)
-	updateRefreshTokenFn  func(ctx context.Context, userID uint64, token string) error
+	updateRefreshTokenFn  func(ctx context.Context, userID int64, token string) error
 }
 
 func (m *mockRepo) Create(ctx context.Context, u *User) error {
@@ -28,33 +28,33 @@ func (m *mockRepo) GetByRefreshToken(ctx context.Context, token string) (*User, 
 	return m.getByRefreshTokenFn(ctx, token)
 }
 
-func (m *mockRepo) UpdateRefreshToken(ctx context.Context, userID uint64, token string) error {
+func (m *mockRepo) UpdateRefreshToken(ctx context.Context, userID int64, token string) error {
 	return m.updateRefreshTokenFn(ctx, userID, token)
 }
 
 type mockTokens struct {
-	generateAccessFn   func(userID uint64) (string, error)
-	generateRefreshFn  func(userID uint64) (string, error)
-	validateRefreshFn  func(token string) (uint64, error)
+	generateAccessFn   func(userID int64) (string, error)
+	generateRefreshFn  func(userID int64) (string, error)
+	validateRefreshFn  func(token string) (int64, error)
 }
 
-func (m *mockTokens) GenerateAccess(userID uint64) (string, error) {
+func (m *mockTokens) GenerateAccess(userID int64) (string, error) {
 	return m.generateAccessFn(userID)
 }
 
-func (m *mockTokens) GenerateRefresh(userID uint64) (string, error) {
+func (m *mockTokens) GenerateRefresh(userID int64) (string, error) {
 	return m.generateRefreshFn(userID)
 }
 
-func (m *mockTokens) ValidateRefresh(token string) (uint64, error) {
+func (m *mockTokens) ValidateRefresh(token string) (int64, error) {
 	return m.validateRefreshFn(token)
 }
 
 var (
 	okTokens = &mockTokens{
-		generateAccessFn:  func(_ uint64) (string, error) { return "access-token", nil },
-		generateRefreshFn: func(_ uint64) (string, error) { return "refresh-token", nil },
-		validateRefreshFn: func(_ string) (uint64, error) { return 1, nil },
+		generateAccessFn:  func(_ int64) (string, error) { return "access-token", nil },
+		generateRefreshFn: func(_ int64) (string, error) { return "refresh-token", nil },
+		validateRefreshFn: func(_ string) (int64, error) { return 1, nil },
 	}
 )
 
@@ -106,7 +106,7 @@ func TestService_Login(t *testing.T) {
 
 	okRepo := &mockRepo{
 		getByEmailFn:         func(_ context.Context, _ string) (*User, error) { return existingUser, nil },
-		updateRefreshTokenFn: func(_ context.Context, _ uint64, _ string) error { return nil },
+		updateRefreshTokenFn: func(_ context.Context, _ int64, _ string) error { return nil },
 	}
 
 	tests := []struct {
