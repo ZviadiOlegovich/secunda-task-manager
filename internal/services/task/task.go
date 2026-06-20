@@ -1,6 +1,9 @@
 package task
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 type TaskStatus string
 
@@ -18,6 +21,32 @@ const (
 	PriorityHigh   TaskPriority = "high"
 )
 
+func (p TaskPriority) isValid() bool {
+	switch p {
+	case PriorityLow, PriorityMedium, PriorityHigh:
+		return true
+	}
+	return false
+}
+
+type TaskEstimate string
+
+const (
+	EstimateXS TaskEstimate = "XS"
+	EstimateS  TaskEstimate = "S"
+	EstimateM  TaskEstimate = "M"
+	EstimateL  TaskEstimate = "L"
+	EstimateXL TaskEstimate = "XL"
+)
+
+func (e TaskEstimate) isValid() bool {
+	switch e {
+	case EstimateXS, EstimateS, EstimateM, EstimateL, EstimateXL:
+		return true
+	}
+	return false
+}
+
 type Task struct {
 	ID          int64
 	TeamID      int64
@@ -25,9 +54,49 @@ type Task struct {
 	Description *string
 	Status      TaskStatus
 	Priority    TaskPriority
+	Estimate    *TaskEstimate
 	AssigneeID  *int64
 	CreatedBy   int64
 	DueDate     *time.Time
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+}
+
+type CreateTaskInput struct {
+	TeamID      int64
+	Title       string
+	Description *string
+	Priority    TaskPriority
+	Estimate    *TaskEstimate
+	AssigneeID  *int64
+	CreatedBy   int64
+	DueDate     *time.Time
+}
+
+func (i *CreateTaskInput) applyDefaults() {
+	i.Title = strings.TrimSpace(i.Title)
+	if i.Priority == "" {
+		i.Priority = PriorityMedium
+	}
+}
+
+func (i *CreateTaskInput) participantIDs() []int64 {
+	ids := []int64{i.CreatedBy}
+	if i.AssigneeID != nil && *i.AssigneeID != i.CreatedBy {
+		ids = append(ids, *i.AssigneeID)
+	}
+	return ids
+}
+
+func (i *CreateTaskInput) validate() error {
+	if i.Title == "" {
+		return ErrInvalidTitle
+	}
+	if !i.Priority.isValid() {
+		return ErrInvalidPriority
+	}
+	if i.Estimate != nil && !i.Estimate.isValid() {
+		return ErrInvalidEstimate
+	}
+	return nil
 }

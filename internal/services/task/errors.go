@@ -8,4 +8,5 @@ var (
 	ErrInvalidTitle     = errors.New("task title is required")
 	ErrInvalidStatus    = errors.New("invalid task status")
 	ErrInvalidPriority  = errors.New("invalid task priority")
+	ErrInvalidEstimate  = errors.New("invalid task estimate")
 )

@@ -20,10 +20,10 @@ func NewTaskRepository(db *sql.DB) *taskRepository {
 }
 
 func (r *taskRepository) Create(ctx context.Context, t *task.Task) (int64, error) {
-	const q = `INSERT INTO tasks (team_id, title, description, status, priority, assignee_id, created_by, due_date)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+	const q = `INSERT INTO tasks (team_id, title, description, status, priority, estimate, assignee_id, created_by, due_date)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	result, err := r.db.ExecContext(ctx, q,
-		t.TeamID, t.Title, t.Description, t.Status, t.Priority, t.AssigneeID, t.CreatedBy, t.DueDate,
+		t.TeamID, t.Title, t.Description, t.Status, t.Priority, t.Estimate, t.AssigneeID, t.CreatedBy, t.DueDate,
 	)
 	if err != nil {
 		return 0, err
@@ -32,11 +32,11 @@ func (r *taskRepository) Create(ctx context.Context, t *task.Task) (int64, error
 }
 
 func (r *taskRepository) GetByID(ctx context.Context, id int64) (*task.Task, error) {
-	const q = `SELECT id, team_id, title, description, status, priority, assignee_id, created_by, due_date, created_at, updated_at
+	const q = `SELECT id, team_id, title, description, status, priority, estimate, assignee_id, created_by, due_date, created_at, updated_at
 		FROM tasks WHERE id = ?`
 	t := &task.Task{}
 	err := r.db.QueryRowContext(ctx, q, id).Scan(
-		&t.ID, &t.TeamID, &t.Title, &t.Description, &t.Status, &t.Priority,
+		&t.ID, &t.TeamID, &t.Title, &t.Description, &t.Status, &t.Priority, &t.Estimate,
 		&t.AssigneeID, &t.CreatedBy, &t.DueDate, &t.CreatedAt, &t.UpdatedAt,
 	)
 	if err != nil {
@@ -49,10 +49,10 @@ func (r *taskRepository) GetByID(ctx context.Context, id int64) (*task.Task, err
 }
 
 func (r *taskRepository) Update(ctx context.Context, t *task.Task) error {
-	const q = `UPDATE tasks SET title = ?, description = ?, status = ?, priority = ?, assignee_id = ?, due_date = ?
+	const q = `UPDATE tasks SET title = ?, description = ?, status = ?, priority = ?, estimate = ?, assignee_id = ?, due_date = ?
 		WHERE id = ?`
 	_, err := r.db.ExecContext(ctx, q,
-		t.Title, t.Description, t.Status, t.Priority, t.AssigneeID, t.DueDate, t.ID,
+		t.Title, t.Description, t.Status, t.Priority, t.Estimate, t.AssigneeID, t.DueDate, t.ID,
 	)
 	return err
 }
@@ -75,7 +75,7 @@ func (r *taskRepository) List(ctx context.Context, filter task.ListFilter) ([]*t
 	offset := (page - 1) * limit
 
 	q := fmt.Sprintf(
-		`SELECT id, team_id, title, description, status, priority, assignee_id, created_by, due_date, created_at, updated_at
+		`SELECT id, team_id, title, description, status, priority, estimate, assignee_id, created_by, due_date, created_at, updated_at
 		FROM tasks WHERE %s ORDER BY created_at DESC LIMIT ? OFFSET ?`,
 		wb.clause(),
 	)
@@ -90,7 +90,7 @@ func (r *taskRepository) List(ctx context.Context, filter task.ListFilter) ([]*t
 	for rows.Next() {
 		t := &task.Task{}
 		if err := rows.Scan(
-			&t.ID, &t.TeamID, &t.Title, &t.Description, &t.Status, &t.Priority,
+			&t.ID, &t.TeamID, &t.Title, &t.Description, &t.Status, &t.Priority, &t.Estimate,
 			&t.AssigneeID, &t.CreatedBy, &t.DueDate, &t.CreatedAt, &t.UpdatedAt,
 		); err != nil {
 			return nil, err

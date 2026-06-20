@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     priority    VARCHAR(20)     NOT NULL,
     assignee_id BIGINT UNSIGNED     NULL,
     created_by  BIGINT UNSIGNED NOT NULL,
+    estimate    VARCHAR(2)          NULL,
     due_date    DATETIME            NULL,
     created_at  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

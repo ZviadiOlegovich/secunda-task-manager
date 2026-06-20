@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/zoshc/secunda-task-manager/internal/services/errs"
@@ -105,4 +107,24 @@ func (r *teamRepository) GetMember(ctx context.Context, teamID, userID int64) (*
 		return nil, err
 	}
 	return m, nil
+}
+
+func (r *teamRepository) AreMembersOf(ctx context.Context, teamID int64, userIDs []int64) error {
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(userIDs)), ",")
+	q := fmt.Sprintf(`SELECT COUNT(*) FROM team_members WHERE team_id = ? AND user_id IN (%s)`, placeholders)
+
+	args := make([]any, 0, len(userIDs)+1)
+	args = append(args, teamID)
+	for _, id := range userIDs {
+		args = append(args, id)
+	}
+
+	var count int
+	if err := r.db.QueryRowContext(ctx, q, args...).Scan(&count); err != nil {
+		return err
+	}
+	if count < len(userIDs) {
+		return errs.ErrNotFound
+	}
+	return nil
 }
