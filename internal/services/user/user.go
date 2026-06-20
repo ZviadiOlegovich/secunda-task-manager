@@ -16,6 +16,27 @@ type User struct {
 	UpdatedAt    time.Time
 }
 
+type Tokens struct {
+	Access  string
+	Refresh string
+}
+
+type LoginInput struct {
+	Email    string
+	Password string
+}
+
+func (i *LoginInput) validate() error {
+	i.Email = strings.ToLower(strings.TrimSpace(i.Email))
+	if _, err := mail.ParseAddress(i.Email); err != nil {
+		return ErrInvalidEmail
+	}
+	if i.Password == "" {
+		return ErrInvalidCredentials
+	}
+	return nil
+}
+
 type RegisterInput struct {
 	Email    string
 	Password string

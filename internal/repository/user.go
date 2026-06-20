@@ -49,3 +49,9 @@ func (r *userRepository) GetByEmail(ctx context.Context, email string) (*user.Us
 	}
 	return u, nil
 }
+
+func (r *userRepository) UpdateRefreshToken(ctx context.Context, userID uint64, token string) error {
+	const q = `UPDATE users SET refresh_token = ? WHERE id = ?`
+	_, err := r.db.ExecContext(ctx, q, token, userID)
+	return err
+}

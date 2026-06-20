@@ -5,15 +5,17 @@ import (
 	"errors"
 
 	"github.com/rs/zerolog"
+	"github.com/zoshc/secunda-task-manager/internal/services/errs"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type Service struct {
-	repo Repository
+	repo   Repository
+	tokens TokenProvider
 }
 
-func New(repo Repository) *Service {
-	return &Service{repo: repo}
+func New(repo Repository, tokens TokenProvider) *Service {
+	return &Service{repo: repo, tokens: tokens}
 }
 
 func (s *Service) Register(ctx context.Context, input RegisterInput) error {
@@ -43,4 +45,52 @@ func (s *Service) Register(ctx context.Context, input RegisterInput) error {
 	}
 
 	return nil
+}
+
+func (s *Service) Login(ctx context.Context, input LoginInput) (*Tokens, error) {
+	logger := zerolog.Ctx(ctx)
+
+	if err := input.validate(); err != nil {
+		logger.Warn().Err(err).Msg("invalid login input")
+		return nil, err
+	}
+
+	u, err := s.repo.GetByEmail(ctx, input.Email)
+	if err != nil {
+		if errors.Is(err, errs.ErrNotFound) {
+			return nil, ErrInvalidCredentials
+		}
+		logger.Error().Err(err).Msg("get user by email")
+		return nil, err
+	}
+
+	if err = bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(input.Password)); err != nil {
+		return nil, ErrInvalidCredentials
+	}
+
+	tokens, err := s.issueTokens(ctx, u.ID)
+	if err != nil {
+		logger.Error().Err(err).Msg("issue tokens")
+		return nil, err
+	}
+
+	return tokens, nil
+}
+
+func (s *Service) issueTokens(ctx context.Context, userID uint64) (*Tokens, error) {
+	accessToken, err := s.tokens.GenerateAccess(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	refreshToken, err := s.tokens.GenerateRefresh(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = s.repo.UpdateRefreshToken(ctx, userID, refreshToken); err != nil {
+		return nil, err
+	}
+
+	return &Tokens{Access: accessToken, Refresh: refreshToken}, nil
 }
