@@ -13,6 +13,7 @@ import (
 	"github.com/zoshc/secunda-task-manager/internal/closer"
 	"github.com/zoshc/secunda-task-manager/internal/config"
 	"github.com/zoshc/secunda-task-manager/internal/repository"
+	"github.com/zoshc/secunda-task-manager/internal/services/task"
 	"github.com/zoshc/secunda-task-manager/internal/services/team"
 	"github.com/zoshc/secunda-task-manager/internal/services/user"
 	"github.com/zoshc/secunda-task-manager/internal/transport/http/middleware"
@@ -63,9 +64,14 @@ func main() {
 	teamSvc := team.New(teamRepo)
 	teamHandler := handler.NewTeamHandler(authMiddleware, teamSvc)
 
+	taskRepo := repository.NewTaskRepository(db)
+	taskSvc := task.New(taskRepo, teamRepo)
+	taskHandler := handler.NewTaskHandler(authMiddleware, taskSvc)
+
 	srv := http.NewServer(*cfg,
 		router.NewRouter(authHandler.Router()),
 		router.NewRouter(teamHandler.Router()),
+		router.NewRouter(taskHandler.Router()),
 	)
 	privateSrv := http.NewPrivateServer(cfg.Server.PrivatePort)
 

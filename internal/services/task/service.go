@@ -94,6 +94,10 @@ func (s *Service) UpdateTask(ctx context.Context, update UpdateTaskInput) error 
 func (s *Service) ListTasks(ctx context.Context, filter ListFilter) ([]*Task, error) {
 	logger := zerolog.Ctx(ctx)
 
+	if err := filter.validate(); err != nil {
+		return nil, err
+	}
+
 	if err := s.teamRepo.AreMembersOf(ctx, filter.TeamID, []int64{filter.RequestedBy}); err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
 			return nil, ErrNotMember

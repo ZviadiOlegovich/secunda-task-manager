@@ -119,6 +119,16 @@ type ListFilter struct {
 	Limit       int
 }
 
+func (f *ListFilter) validate() error {
+	if f.Status != nil && !f.Status.isValid() {
+		return ErrInvalidStatus
+	}
+	if f.Priority != nil && !f.Priority.isValid() {
+		return ErrInvalidPriority
+	}
+	return nil
+}
+
 type UpdateTaskInput struct {
 	TaskID    int64
 	TeamID    int64

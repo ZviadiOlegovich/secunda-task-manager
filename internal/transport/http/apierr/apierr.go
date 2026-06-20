@@ -6,6 +6,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/zoshc/secunda-task-manager/internal/services/errs"
+	"github.com/zoshc/secunda-task-manager/internal/services/task"
 	"github.com/zoshc/secunda-task-manager/internal/services/team"
 	"github.com/zoshc/secunda-task-manager/internal/services/user"
 )
@@ -37,8 +38,14 @@ func statusCode(err error) int {
 		return http.StatusBadRequest
 	case errors.Is(err, user.ErrInvalidCredentials):
 		return http.StatusUnauthorized
-	case errors.Is(err, team.ErrPermissionDenied):
+	case errors.Is(err, team.ErrPermissionDenied),
+		errors.Is(err, task.ErrNotMember):
 		return http.StatusForbidden
+	case errors.Is(err, task.ErrInvalidTitle),
+		errors.Is(err, task.ErrInvalidStatus),
+		errors.Is(err, task.ErrInvalidPriority),
+		errors.Is(err, task.ErrInvalidEstimate):
+		return http.StatusBadRequest
 	default:
 		return http.StatusInternalServerError
 	}
