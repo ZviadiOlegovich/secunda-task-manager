@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS teams (
 CREATE TABLE IF NOT EXISTS team_members (
     team_id    BIGINT UNSIGNED                  NOT NULL,
     user_id    BIGINT UNSIGNED                  NOT NULL,
-    role       ENUM('owner', 'admin', 'member') NOT NULL DEFAULT 'member',
+    role       VARCHAR(20)                      NOT NULL,
     created_at DATETIME                         NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     PRIMARY KEY (team_id, user_id),
