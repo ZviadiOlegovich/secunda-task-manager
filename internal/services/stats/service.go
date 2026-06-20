@@ -22,3 +22,12 @@ func (s *Service) TeamStats(ctx context.Context) ([]TeamStat, error) {
 	}
 	return stats, nil
 }
+
+func (s *Service) TopUsers(ctx context.Context) ([]TopUser, error) {
+	users, err := s.repo.TopUsers(ctx)
+	if err != nil {
+		zerolog.Ctx(ctx).Error().Err(err).Msg("top users")
+		return nil, err
+	}
+	return users, nil
+}

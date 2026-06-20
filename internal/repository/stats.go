@@ -20,7 +20,7 @@ func (r *statsRepository) TeamStats(ctx context.Context) ([]stats.TeamStat, erro
 		SELECT
 			t.id,
 			t.name,
-			COUNT(DISTINCT tm.user_id)                                                                               AS member_count,
+			COUNT(DISTINCT tm.user_id) AS member_count,
 			COUNT(DISTINCT CASE WHEN ta.status = 'done' AND ta.updated_at >= NOW() - INTERVAL 7 DAY THEN ta.id END) AS done_last_week
 		FROM teams t
 		LEFT JOIN team_members tm ON tm.team_id = t.id
@@ -41,6 +41,48 @@ func (r *statsRepository) TeamStats(ctx context.Context) ([]stats.TeamStat, erro
 			return nil, err
 		}
 		result = append(result, s)
+	}
+	return result, rows.Err()
+}
+
+func (r *statsRepository) TopUsers(ctx context.Context) ([]stats.TopUser, error) {
+	const q = `
+		WITH ranked AS (
+			SELECT
+				t.id              AS team_id,
+				t.name            AS team_name,
+				u.id              AS user_id,
+				u.name            AS user_name,
+				COUNT(ta.id)      AS task_count,
+				-- RANK даёт одинаковый ранг при ничьей, поэтому результат может содержать >3 строк на команду.
+				-- Если нужно ровно 3 — заменить на ROW_NUMBER() (но тогда ничья разрешается произвольно).
+				RANK() OVER (PARTITION BY t.id ORDER BY COUNT(ta.id) DESC) AS rn
+			FROM teams t
+			JOIN team_members tm ON tm.team_id = t.id
+			JOIN users u         ON u.id = tm.user_id
+			LEFT JOIN tasks ta   ON ta.team_id = t.id
+			                    AND ta.created_by = u.id
+			                    AND ta.created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')
+			GROUP BY t.id, t.name, u.id, u.name
+		)
+		SELECT team_id, team_name, user_id, user_name, task_count, rn
+		FROM ranked
+		WHERE rn <= 3
+		ORDER BY team_id, rn`
+
+	rows, err := r.db.QueryContext(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []stats.TopUser
+	for rows.Next() {
+		var u stats.TopUser
+		if err := rows.Scan(&u.TeamID, &u.TeamName, &u.UserID, &u.UserName, &u.TaskCount, &u.Rank); err != nil {
+			return nil, err
+		}
+		result = append(result, u)
 	}
 	return result, rows.Err()
 }
