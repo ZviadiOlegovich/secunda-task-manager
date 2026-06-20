@@ -18,24 +18,24 @@ func New(repo Repository, tokens TokenProvider) *Service {
 	return &Service{repo: repo, tokens: tokens}
 }
 
-func (s *Service) Register(ctx context.Context, input RegisterInput) error {
+func (s *Service) Register(ctx context.Context, reg RegisterInput) error {
 	logger := zerolog.Ctx(ctx)
 
-	if err := input.validate(); err != nil {
+	if err := reg.validate(); err != nil {
 		logger.Warn().Err(err).Msg("invalid register input")
 		return err
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(reg.Password), bcrypt.DefaultCost)
 	if err != nil {
 		logger.Error().Err(err).Msg("generate password hash")
 		return err
 	}
 
 	if err = s.repo.Create(ctx, &User{
-		Email:        input.Email,
+		Email:        reg.Email,
 		PasswordHash: string(hash),
-		Name:         input.Name,
+		Name:         reg.Name,
 	}); err != nil {
 		if errors.Is(err, ErrEmailTaken) {
 			return err
@@ -47,15 +47,15 @@ func (s *Service) Register(ctx context.Context, input RegisterInput) error {
 	return nil
 }
 
-func (s *Service) Login(ctx context.Context, input LoginInput) (*Tokens, error) {
+func (s *Service) Login(ctx context.Context, creds LoginInput) (*Tokens, error) {
 	logger := zerolog.Ctx(ctx)
 
-	if err := input.validate(); err != nil {
+	if err := creds.validate(); err != nil {
 		logger.Warn().Err(err).Msg("invalid login input")
 		return nil, err
 	}
 
-	u, err := s.repo.GetByEmail(ctx, input.Email)
+	u, err := s.repo.GetByEmail(ctx, creds.Email)
 	if err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
 			return nil, ErrInvalidCredentials
@@ -64,7 +64,7 @@ func (s *Service) Login(ctx context.Context, input LoginInput) (*Tokens, error) 
 		return nil, err
 	}
 
-	if err = bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(input.Password)); err != nil {
+	if err = bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(creds.Password)); err != nil {
 		return nil, ErrInvalidCredentials
 	}
 

@@ -47,11 +47,10 @@ func (s *Service) CreateTeam(ctx context.Context, userID int64, name string) (*T
 	return t, nil
 }
 
-func (s *Service) InviteUser(ctx context.Context, input InviteUserInput) error {
-	teamID, inviterID, inviteeID, role := input.TeamID, input.InviterID, input.InviteeID, input.Role
+func (s *Service) InviteUser(ctx context.Context, invite InviteUserInput) error {
 	logger := zerolog.Ctx(ctx)
 
-	inviter, err := s.repo.GetMember(ctx, teamID, inviterID)
+	inviter, err := s.repo.GetMember(ctx, invite.TeamID, invite.InviterID)
 	if err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
 			return ErrPermissionDenied
@@ -60,14 +59,14 @@ func (s *Service) InviteUser(ctx context.Context, input InviteUserInput) error {
 		return err
 	}
 
-	if !canInvite(inviter.Role, role) {
+	if !canInvite(inviter.Role, invite.Role) {
 		return ErrPermissionDenied
 	}
 
 	if err := s.repo.AddMember(ctx, &TeamMember{
-		TeamID: teamID,
-		UserID: inviteeID,
-		Role:   role,
+		TeamID: invite.TeamID,
+		UserID: invite.InviteeID,
+		Role:   invite.Role,
 	}); err != nil {
 		if errors.Is(err, ErrAlreadyMember) {
 			return err

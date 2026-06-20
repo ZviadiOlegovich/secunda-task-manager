@@ -10,8 +10,8 @@ import (
 )
 
 type AuthService interface {
-	Register(ctx context.Context, input user.RegisterInput) error
-	Login(ctx context.Context, input user.LoginInput) (*user.Tokens, error)
+	Register(ctx context.Context, reg user.RegisterInput) error
+	Login(ctx context.Context, creds user.LoginInput) (*user.Tokens, error)
 	Refresh(ctx context.Context, refreshToken string) (*user.Tokens, error)
 }
 
