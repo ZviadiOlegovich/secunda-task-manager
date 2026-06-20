@@ -15,3 +15,10 @@ type TopUser struct {
 	TaskCount int
 	Rank      int
 }
+
+type TaskWithInvalidAssignee struct {
+	TaskID     int64
+	TaskTitle  string
+	TeamID     int64
+	AssigneeID int64
+}

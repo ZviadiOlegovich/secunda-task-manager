@@ -31,3 +31,12 @@ func (s *Service) TopUsers(ctx context.Context) ([]TopUser, error) {
 	}
 	return users, nil
 }
+
+func (s *Service) TasksWithInvalidAssignee(ctx context.Context) ([]TaskWithInvalidAssignee, error) {
+	tasks, err := s.repo.TasksWithInvalidAssignee(ctx)
+	if err != nil {
+		zerolog.Ctx(ctx).Error().Err(err).Msg("orphan tasks")
+		return nil, err
+	}
+	return tasks, nil
+}

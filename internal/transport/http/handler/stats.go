@@ -12,6 +12,7 @@ import (
 type StatsService interface {
 	TeamStats(ctx context.Context) ([]stats.TeamStat, error)
 	TopUsers(ctx context.Context) ([]stats.TopUser, error)
+	TasksWithInvalidAssignee(ctx context.Context) ([]stats.TaskWithInvalidAssignee, error)
 }
 
 type TeamStatResponse struct {
@@ -41,11 +42,37 @@ func NewStatsHandler(auth fiber.Handler, svc StatsService) *statsHandler {
 		g := r.Group("/stats", auth)
 		g.Get("/teams", h.teams)
 		g.Get("/top-users", h.topUsers)
+		g.Get("/integrity", h.integrity)
 	}
 	return h
 }
 
 func (h *statsHandler) Router() router.MakeRouter { return h.makeRouter }
+
+type TaskWithInvalidAssigneeResponse struct {
+	TaskID     int64  `json:"task_id"`
+	TaskTitle  string `json:"task_title"`
+	TeamID     int64  `json:"team_id"`
+	AssigneeID int64  `json:"assignee_id"`
+}
+
+func (h *statsHandler) integrity(c *fiber.Ctx) error {
+	result, err := h.svc.TasksWithInvalidAssignee(c.UserContext())
+	if err != nil {
+		return apierr.Response(c, err)
+	}
+
+	resp := make([]TaskWithInvalidAssigneeResponse, len(result))
+	for i, o := range result {
+		resp[i] = TaskWithInvalidAssigneeResponse{
+			TaskID:     o.TaskID,
+			TaskTitle:  o.TaskTitle,
+			TeamID:     o.TeamID,
+			AssigneeID: o.AssigneeID,
+		}
+	}
+	return c.JSON(resp)
+}
 
 func (h *statsHandler) topUsers(c *fiber.Ctx) error {
 	result, err := h.svc.TopUsers(c.UserContext())

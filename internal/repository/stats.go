@@ -35,7 +35,8 @@ func (r *statsRepository) TeamStats(ctx context.Context) ([]stats.TeamStat, erro
 			  AND updated_at >= NOW() - INTERVAL 7 DAY
 			GROUP BY team_id
 		) d ON d.team_id = t.id
-		ORDER BY t.id`
+		ORDER BY t.id
+		LIMIT 1000`
 
 	rows, err := r.db.QueryContext(ctx, q)
 	if err != nil {
@@ -55,6 +56,8 @@ func (r *statsRepository) TeamStats(ctx context.Context) ([]stats.TeamStat, erro
 }
 
 func (r *statsRepository) TopUsers(ctx context.Context) ([]stats.TopUser, error) {
+	// RANK даёт одинаковый ранг при ничьей, поэтому результат может содержать >3 строк на команду.
+	// Если нужно ровно 3 - заменить на ROW_NUMBER() (но тогда ничья разрешается произвольно).
 	const q = `
 		WITH ranked AS (
 			SELECT
@@ -63,8 +66,6 @@ func (r *statsRepository) TopUsers(ctx context.Context) ([]stats.TopUser, error)
 				u.id              AS user_id,
 				u.name            AS user_name,
 				COUNT(ta.id)      AS task_count,
-				-- RANK даёт одинаковый ранг при ничьей, поэтому результат может содержать >3 строк на команду.
-				-- Если нужно ровно 3 — заменить на ROW_NUMBER() (но тогда ничья разрешается произвольно).
 				RANK() OVER (PARTITION BY t.id ORDER BY COUNT(ta.id) DESC) AS rn
 			FROM teams t
 			JOIN team_members tm ON tm.team_id = t.id
@@ -92,6 +93,37 @@ func (r *statsRepository) TopUsers(ctx context.Context) ([]stats.TopUser, error)
 			return nil, err
 		}
 		result = append(result, u)
+	}
+	return result, rows.Err()
+}
+
+func (r *statsRepository) TasksWithInvalidAssignee(ctx context.Context) ([]stats.TaskWithInvalidAssignee, error) {
+	const q = `
+		SELECT t.id, t.title, t.team_id, t.assignee_id
+		FROM tasks t
+		WHERE t.assignee_id IS NOT NULL
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM team_members tm
+			WHERE tm.team_id = t.team_id
+			  AND tm.user_id = t.assignee_id
+		)
+		ORDER BY t.id
+		LIMIT 1000`
+
+	rows, err := r.db.QueryContext(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []stats.TaskWithInvalidAssignee
+	for rows.Next() {
+		var o stats.TaskWithInvalidAssignee
+		if err := rows.Scan(&o.TaskID, &o.TaskTitle, &o.TeamID, &o.AssigneeID); err != nil {
+			return nil, err
+		}
+		result = append(result, o)
 	}
 	return result, rows.Err()
 }
