@@ -18,9 +18,14 @@ func NewTeamRepository(db *sql.DB) *teamRepository {
 	return &teamRepository{db: db}
 }
 
-func (r *teamRepository) Create(ctx context.Context, t *team.Team) (int64, error) {
-	const q = `INSERT INTO teams (name, created_by) VALUES (?, ?)`
-	result, err := r.db.ExecContext(ctx, q, t.Name, t.CreatedBy)
+func (r *teamRepository) CreateWithOwner(ctx context.Context, t *team.Team, ownerID int64) (int64, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	result, err := tx.ExecContext(ctx, `INSERT INTO teams (name, created_by) VALUES (?, ?)`, t.Name, t.CreatedBy)
 	if err != nil {
 		return 0, err
 	}
@@ -28,7 +33,16 @@ func (r *teamRepository) Create(ctx context.Context, t *team.Team) (int64, error
 	if err != nil {
 		return 0, err
 	}
-	return id, nil
+
+	_, err = tx.ExecContext(ctx,
+		`INSERT INTO team_members (team_id, user_id, role) VALUES (?, ?, ?)`,
+		id, ownerID, team.RoleOwner,
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	return id, tx.Commit()
 }
 
 func (r *teamRepository) AddMember(ctx context.Context, m *team.TeamMember) error {

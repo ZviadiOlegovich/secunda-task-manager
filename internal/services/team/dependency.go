@@ -3,7 +3,7 @@ package team
 import "context"
 
 type Repository interface {
-	Create(ctx context.Context, team *Team) (int64, error)
+	CreateWithOwner(ctx context.Context, team *Team, ownerID int64) (int64, error)
 	AddMember(ctx context.Context, member *TeamMember) error
 	GetByID(ctx context.Context, id int64) (*Team, error)
 	GetByUserID(ctx context.Context, userID int64) ([]*Team, error)
