@@ -14,6 +14,7 @@ RUN apk add --no-cache wget ca-certificates tzdata
 
 WORKDIR /app
 COPY --from=builder /build/server .
+COPY migrations/ migrations/
 
 EXPOSE 8080 8081
 
