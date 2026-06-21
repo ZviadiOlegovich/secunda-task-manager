@@ -8,6 +8,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/zoshc/secunda-task-manager/internal/config"
+	"github.com/zoshc/secunda-task-manager/internal/transport/http/middleware"
 	"github.com/zoshc/secunda-task-manager/internal/transport/http/router"
 )
 
@@ -30,6 +31,7 @@ func NewServer(cfg config.Config, routers ...router.Router) *server {
 	s.fiber.Use(cors.New(cors.Config{
 		AllowOrigins: cfg.App.AllowedOrigins,
 	}))
+	s.fiber.Use(middleware.Metrics())
 
 	api := s.fiber.Group("/api/v1")
 	for _, r := range routers {

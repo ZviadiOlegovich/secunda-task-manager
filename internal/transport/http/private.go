@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/valyala/fasthttp/fasthttpadaptor"
 )
 
 type privateServer struct {
@@ -21,6 +23,12 @@ func NewPrivateServer(port int) *privateServer {
 
 	app.Get("/readyz", func(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusOK)
+	})
+
+	metricsHandler := fasthttpadaptor.NewFastHTTPHandler(promhttp.Handler())
+	app.Get("/metrics", func(c *fiber.Ctx) error {
+		metricsHandler(c.Context())
+		return nil
 	})
 
 	return &privateServer{
