@@ -3,18 +3,23 @@ package http
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/valyala/fasthttp/fasthttpadaptor"
 )
 
+type Pinger interface {
+	PingContext(ctx context.Context) error
+}
+
 type privateServer struct {
 	fiber   *fiber.App
 	address string
 }
 
-func NewPrivateServer(port int) *privateServer {
+func NewPrivateServer(port int, checkers []Pinger) *privateServer {
 	app := fiber.New(fiber.Config{DisableStartupMessage: true})
 
 	app.Get("/livez", func(c *fiber.Ctx) error {
@@ -22,7 +27,12 @@ func NewPrivateServer(port int) *privateServer {
 	})
 
 	app.Get("/readyz", func(c *fiber.Ctx) error {
-		return c.SendStatus(fiber.StatusOK)
+		for _, ch := range checkers {
+			if err := ch.PingContext(c.UserContext()); err != nil {
+				return c.Status(http.StatusServiceUnavailable).JSON(fiber.Map{"error": err.Error()})
+			}
+		}
+		return c.SendStatus(http.StatusOK)
 	})
 
 	metricsHandler := fasthttpadaptor.NewFastHTTPHandler(promhttp.Handler())

@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/zoshc/secunda-task-manager/internal/cache"
 	"github.com/zoshc/secunda-task-manager/internal/closer"
 	"github.com/zoshc/secunda-task-manager/internal/config"
@@ -18,13 +19,19 @@ import (
 	"github.com/zoshc/secunda-task-manager/internal/services/task"
 	"github.com/zoshc/secunda-task-manager/internal/services/team"
 	"github.com/zoshc/secunda-task-manager/internal/services/user"
-	"github.com/zoshc/secunda-task-manager/internal/transport/http"
+	transporthttp "github.com/zoshc/secunda-task-manager/internal/transport/http"
 	"github.com/zoshc/secunda-task-manager/internal/transport/http/handler"
 	"github.com/zoshc/secunda-task-manager/internal/transport/http/middleware"
 	"github.com/zoshc/secunda-task-manager/internal/transport/http/router"
 	"github.com/zoshc/secunda-task-manager/pkg/jwt"
 	"github.com/zoshc/secunda-task-manager/pkg/logger"
 )
+
+type redisPinger struct{ rdb *redis.Client }
+
+func (r redisPinger) PingContext(ctx context.Context) error {
+	return r.rdb.Ping(ctx).Err()
+}
 
 func main() {
 	cfg, err := config.Load()
@@ -80,13 +87,16 @@ func main() {
 	statsSvc := stats.New(statsRepo)
 	statsHandler := handler.NewStatsHandler(authMiddleware, userRateLimit, statsSvc)
 
-	srv := http.NewServer(*cfg,
+	srv := transporthttp.NewServer(*cfg,
 		router.NewRouter(authHandler.Router()),
 		router.NewRouter(teamHandler.Router()),
 		router.NewRouter(taskHandler.Router()),
 		router.NewRouter(statsHandler.Router()),
 	)
-	privateSrv := http.NewPrivateServer(cfg.Server.PrivatePort)
+	privateSrv := transporthttp.NewPrivateServer(cfg.Server.PrivatePort, []transporthttp.Pinger{
+		db,
+		redisPinger{rdb},
+	})
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
