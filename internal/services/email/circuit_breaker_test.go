@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/sony/gobreaker/v2"
 )
 
@@ -13,7 +14,7 @@ type failService struct{ err error }
 func (f *failService) SendInvite(_ context.Context, _, _ string) error { return f.err }
 
 func TestCBService_OpensAfterConsecutiveFailures(t *testing.T) {
-	svc := NewCBService(&failService{err: errors.New("smtp error")})
+	svc := NewCBService(&failService{err: errors.New("smtp error")}, zerolog.Nop())
 
 	for range cbFailureThreshold {
 		_ = svc.SendInvite(context.Background(), "user@example.com", "Alpha")
@@ -26,7 +27,7 @@ func TestCBService_OpensAfterConsecutiveFailures(t *testing.T) {
 }
 
 func TestCBService_PassesThroughOnSuccess(t *testing.T) {
-	svc := NewCBService(&MockService{})
+	svc := NewCBService(&MockService{}, zerolog.Nop())
 
 	if err := svc.SendInvite(context.Background(), "user@example.com", "Alpha"); err != nil {
 		t.Errorf("unexpected error: %v", err)
