@@ -68,7 +68,8 @@ func main() {
 	teamSvc := team.New(teamRepo, emailSvc)
 	teamHandler := handler.NewTeamHandler(authMiddleware, teamSvc)
 
-	taskRepo := repository.NewTaskRepository(db)
+	taskCache := cache.NewTaskCache(rdb)
+	taskRepo := repository.NewTaskRepository(db, taskCache)
 	taskSvc := task.New(taskRepo, teamRepo)
 	taskHandler := handler.NewTaskHandler(authMiddleware, taskSvc)
 

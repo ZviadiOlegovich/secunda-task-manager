@@ -78,12 +78,12 @@ func TestService_CreateTeam(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			svc := New(tt.repo, okEmail)
-			team, err := svc.CreateTeam(context.Background(), 1, tt.input)
+			id, err := svc.CreateTeam(context.Background(), 1, tt.input)
 			if !errors.Is(err, tt.wantErr) {
 				t.Errorf("expected %v, got %v", tt.wantErr, err)
 			}
-			if tt.wantErr == nil && team == nil {
-				t.Error("expected team, got nil")
+			if tt.wantErr == nil && id <= 0 {
+				t.Error("expected positive id, got 0")
 			}
 		})
 	}

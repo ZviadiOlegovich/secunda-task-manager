@@ -17,20 +17,20 @@ func New(repo Repository, teamRepo TeamRepository) *Service {
 	return &Service{repo: repo, teamRepo: teamRepo}
 }
 
-func (s *Service) CreateTask(ctx context.Context, create CreateTaskInput) (*Task, error) {
+func (s *Service) CreateTask(ctx context.Context, create CreateTaskInput) (int64, error) {
 	logger := zerolog.Ctx(ctx)
 
 	create.applyDefaults()
 	if err := create.validate(); err != nil {
-		return nil, err
+		return 0, err
 	}
 
 	if err := s.teamRepo.AreMembersOf(ctx, create.TeamID, create.participantIDs()); err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
-			return nil, ErrNotMember
+			return 0, ErrNotMember
 		}
 		logger.Error().Err(err).Msg("check membership")
-		return nil, err
+		return 0, err
 	}
 
 	t := &Task{
@@ -48,11 +48,9 @@ func (s *Service) CreateTask(ctx context.Context, create CreateTaskInput) (*Task
 	id, err := s.repo.Create(ctx, t)
 	if err != nil {
 		logger.Error().Err(err).Msg("create task")
-		return nil, err
+		return 0, err
 	}
-
-	t.ID = id
-	return t, nil
+	return id, nil
 }
 
 func (s *Service) UpdateTask(ctx context.Context, update UpdateTaskInput) error {
@@ -91,8 +89,16 @@ func (s *Service) UpdateTask(ctx context.Context, update UpdateTaskInput) error 
 	return nil
 }
 
-func (s *Service) GetTaskHistory(ctx context.Context, taskID int64) ([]HistoryRecord, error) {
+func (s *Service) GetTaskHistory(ctx context.Context, taskID, teamID int64) ([]HistoryRecord, error) {
 	logger := zerolog.Ctx(ctx)
+
+	t, err := s.repo.GetByID(ctx, taskID)
+	if err != nil {
+		return nil, err
+	}
+	if t.TeamID != teamID {
+		return nil, errs.ErrNotFound
+	}
 
 	records, err := s.repo.ListHistory(ctx, taskID)
 	if err != nil {

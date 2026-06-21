@@ -27,27 +27,20 @@ type InviteUserInput struct {
 	Role         Role
 }
 
-func (s *Service) CreateTeam(ctx context.Context, userID int64, name string) (*Team, error) {
+func (s *Service) CreateTeam(ctx context.Context, userID int64, name string) (int64, error) {
 	logger := zerolog.Ctx(ctx)
 
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return nil, ErrInvalidName
+		return 0, ErrInvalidName
 	}
 
-	t := &Team{
-		Name:      name,
-		CreatedBy: userID,
-	}
-
-	id, err := s.repo.CreateWithOwner(ctx, t, userID)
+	id, err := s.repo.CreateWithOwner(ctx, &Team{Name: name, CreatedBy: userID}, userID)
 	if err != nil {
 		logger.Error().Err(err).Msg("create team with owner")
-		return nil, err
+		return 0, err
 	}
-
-	t.ID = id
-	return t, nil
+	return id, nil
 }
 
 func (s *Service) InviteUser(ctx context.Context, invite InviteUserInput) error {

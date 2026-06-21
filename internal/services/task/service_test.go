@@ -186,12 +186,12 @@ func TestService_CreateTask(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			svc := New(tt.repo, tt.teamRepo)
-			task, err := svc.CreateTask(context.Background(), tt.input)
+			id, err := svc.CreateTask(context.Background(), tt.input)
 			if !errors.Is(err, tt.wantErr) {
 				t.Errorf("want %v, got %v", tt.wantErr, err)
 			}
-			if tt.wantErr == nil && task == nil {
-				t.Error("expected task, got nil")
+			if tt.wantErr == nil && id <= 0 {
+				t.Error("expected positive id, got 0")
 			}
 		})
 	}
@@ -212,6 +212,7 @@ func TestService_GetTaskHistory(t *testing.T) {
 	tests := []struct {
 		name    string
 		taskID  int64
+		teamID  int64
 		repo    Repository
 		wantLen int
 		wantErr error
@@ -219,16 +220,24 @@ func TestService_GetTaskHistory(t *testing.T) {
 		{
 			name:    "success",
 			taskID:  10,
+			teamID:  1,
 			repo:    historyRepo(taskForUpdate(1)),
 			wantLen: 1,
 		},
 		{
-			name:   "repo error",
+			name:   "wrong team returns not found",
 			taskID: 10,
+			teamID: 99,
+			repo:   historyRepo(taskForUpdate(1)),
+			wantErr: errs.ErrNotFound,
+		},
+		{
+			name:   "repo error on list history",
+			taskID: 10,
+			teamID: 1,
 			repo: &mockRepo{
-				listHistoryFn: func(_ context.Context, _ int64) ([]HistoryRecord, error) {
-					return nil, errors.New("db error")
-				},
+				getByIDFn:     func(_ context.Context, _ int64) (*Task, error) { return taskForUpdate(1), nil },
+				listHistoryFn: func(_ context.Context, _ int64) ([]HistoryRecord, error) { return nil, errors.New("db error") },
 			},
 			wantErr: errors.New("db error"),
 		},
@@ -237,7 +246,7 @@ func TestService_GetTaskHistory(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			svc := New(tt.repo, memberTeamRepo)
-			got, err := svc.GetTaskHistory(context.Background(), tt.taskID)
+			got, err := svc.GetTaskHistory(context.Background(), tt.taskID, tt.teamID)
 			if tt.wantErr != nil && err == nil {
 				t.Errorf("want error, got nil")
 			}

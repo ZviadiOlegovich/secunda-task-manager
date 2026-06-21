@@ -1,6 +1,7 @@
 package task
 
 import (
+	"strconv"
 	"strings"
 	"time"
 )
@@ -117,6 +118,20 @@ type ListFilter struct {
 	AssigneeID  *int64
 	Page        int
 	Limit       int
+}
+
+func (f *ListFilter) FilterKey() string {
+	status, priority, assignee := "", "", ""
+	if f.Status != nil {
+		status = string(*f.Status)
+	}
+	if f.Priority != nil {
+		priority = string(*f.Priority)
+	}
+	if f.AssigneeID != nil {
+		assignee = strconv.FormatInt(*f.AssigneeID, 10)
+	}
+	return strings.Join([]string{status, priority, assignee, strconv.Itoa(f.Page), strconv.Itoa(f.Limit)}, ":")
 }
 
 func (f *ListFilter) validate() error {

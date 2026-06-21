@@ -18,6 +18,13 @@ import (
 	"github.com/zoshc/secunda-task-manager/internal/services/task"
 )
 
+type noopTaskCache struct{}
+
+func (noopTaskCache) GetVersion(_ context.Context, _ int64) (int64, error)                              { return 0, nil }
+func (noopTaskCache) GetTaskList(_ context.Context, _, _ int64, _ string) ([]*task.Task, error)          { return nil, nil }
+func (noopTaskCache) SetTaskListIfVersion(_ context.Context, _, _ int64, _ string, _ []*task.Task) error { return nil }
+func (noopTaskCache) IncrVersion(_ context.Context, _ int64) error                                       { return nil }
+
 func setupMySQL(t *testing.T) *sql.DB {
 	t.Helper()
 	ctx := context.Background()
@@ -113,7 +120,7 @@ func seedTeam(t *testing.T, db *sql.DB, createdBy int64) int64 {
 
 func TestTaskRepository_Create(t *testing.T) {
 	db := setupMySQL(t)
-	repo := repository.NewTaskRepository(db)
+	repo := repository.NewTaskRepository(db, noopTaskCache{})
 	ctx := context.Background()
 
 	userID := seedUser(t, db)
@@ -140,7 +147,7 @@ func TestTaskRepository_Create(t *testing.T) {
 
 func TestTaskRepository_GetByID(t *testing.T) {
 	db := setupMySQL(t)
-	repo := repository.NewTaskRepository(db)
+	repo := repository.NewTaskRepository(db, noopTaskCache{})
 	ctx := context.Background()
 
 	userID := seedUser(t, db)
@@ -177,7 +184,7 @@ func TestTaskRepository_GetByID(t *testing.T) {
 
 func TestTaskRepository_GetByID_NotFound(t *testing.T) {
 	db := setupMySQL(t)
-	repo := repository.NewTaskRepository(db)
+	repo := repository.NewTaskRepository(db, noopTaskCache{})
 
 	_, err := repo.GetByID(context.Background(), 999999)
 	if err != errs.ErrNotFound {
@@ -187,7 +194,7 @@ func TestTaskRepository_GetByID_NotFound(t *testing.T) {
 
 func TestTaskRepository_Update(t *testing.T) {
 	db := setupMySQL(t)
-	repo := repository.NewTaskRepository(db)
+	repo := repository.NewTaskRepository(db, noopTaskCache{})
 	ctx := context.Background()
 
 	userID := seedUser(t, db)
@@ -231,7 +238,7 @@ func TestTaskRepository_Update(t *testing.T) {
 
 func TestTaskRepository_List(t *testing.T) {
 	db := setupMySQL(t)
-	repo := repository.NewTaskRepository(db)
+	repo := repository.NewTaskRepository(db, noopTaskCache{})
 	ctx := context.Background()
 
 	userID := seedUser(t, db)

@@ -20,17 +20,18 @@ func TestTaskCache_MissAndSet(t *testing.T) {
 	c, _ := newTestCache(t)
 	ctx := context.Background()
 
-	got, err := c.GetTaskList(ctx, 1, "filter1")
+	ver, _ := c.GetVersion(ctx, 1)
+	got, err := c.GetTaskList(ctx, 1, ver, "filter1")
 	if err != nil || got != nil {
 		t.Fatalf("want cache miss, got err=%v tasks=%v", err, got)
 	}
 
 	tasks := []*task.Task{{ID: 1, Title: "Fix bug"}, {ID: 2, Title: "Review PR"}}
-	if err := c.SetTaskList(ctx, 1, "filter1", tasks); err != nil {
-		t.Fatalf("SetTaskList: %v", err)
+	if err := c.SetTaskListIfVersion(ctx, 1, ver, "filter1", tasks); err != nil {
+		t.Fatalf("SetTaskListIfVersion: %v", err)
 	}
 
-	got, err = c.GetTaskList(ctx, 1, "filter1")
+	got, err = c.GetTaskList(ctx, 1, ver, "filter1")
 	if err != nil {
 		t.Fatalf("GetTaskList: %v", err)
 	}
@@ -43,14 +44,15 @@ func TestTaskCache_IncrVersionInvalidates(t *testing.T) {
 	c, _ := newTestCache(t)
 	ctx := context.Background()
 
-	tasks := []*task.Task{{ID: 1, Title: "Task"}}
-	_ = c.SetTaskList(ctx, 1, "filter1", tasks)
+	ver, _ := c.GetVersion(ctx, 1)
+	_ = c.SetTaskListIfVersion(ctx, 1, ver, "filter1", []*task.Task{{ID: 1, Title: "Task"}})
 
 	if err := c.IncrVersion(ctx, 1); err != nil {
 		t.Fatalf("IncrVersion: %v", err)
 	}
 
-	got, err := c.GetTaskList(ctx, 1, "filter1")
+	newVer, _ := c.GetVersion(ctx, 1)
+	got, err := c.GetTaskList(ctx, 1, newVer, "filter1")
 	if err != nil {
 		t.Fatalf("GetTaskList: %v", err)
 	}
@@ -59,21 +61,17 @@ func TestTaskCache_IncrVersionInvalidates(t *testing.T) {
 	}
 }
 
-func TestTaskCache_LockPreventsDuplicateWrite(t *testing.T) {
-	c, mr := newTestCache(t)
+func TestTaskCache_StaleWriteDoesNotPollute(t *testing.T) {
+	c, _ := newTestCache(t)
 	ctx := context.Background()
 
-	// Вручную ставим lock
-	mr.Set(c.lockKey(1, "filter1"), "1")
+	ver, _ := c.GetVersion(ctx, 1)
+	_ = c.IncrVersion(ctx, 1)
+	_ = c.SetTaskListIfVersion(ctx, 1, ver, "filter1", []*task.Task{{ID: 1, Title: "Stale"}})
 
-	tasks := []*task.Task{{ID: 1, Title: "Task"}}
-	if err := c.SetTaskList(ctx, 1, "filter1", tasks); err != nil {
-		t.Fatalf("SetTaskList: %v", err)
-	}
-
-	// Lock был занят — кеш не должен быть записан
-	got, _ := c.GetTaskList(ctx, 1, "filter1")
+	newVer, _ := c.GetVersion(ctx, 1)
+	got, _ := c.GetTaskList(ctx, 1, newVer, "filter1")
 	if got != nil {
-		t.Error("want cache miss when lock was held, got data")
+		t.Error("want cache miss on new version, stale write must not pollute it")
 	}
 }

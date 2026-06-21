@@ -13,10 +13,10 @@ import (
 )
 
 type TaskService interface {
-	CreateTask(ctx context.Context, create task.CreateTaskInput) (*task.Task, error)
+	CreateTask(ctx context.Context, create task.CreateTaskInput) (int64, error)
 	ListTasks(ctx context.Context, filter task.ListFilter) ([]*task.Task, error)
 	UpdateTask(ctx context.Context, update task.UpdateTaskInput) error
-	GetTaskHistory(ctx context.Context, taskID int64) ([]task.HistoryRecord, error)
+	GetTaskHistory(ctx context.Context, taskID, teamID int64) ([]task.HistoryRecord, error)
 }
 
 type taskHandler struct {
@@ -49,7 +49,7 @@ func (h *taskHandler) create(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 	}
 
-	t, err := h.svc.CreateTask(c.UserContext(), task.CreateTaskInput{
+	id, err := h.svc.CreateTask(c.UserContext(), task.CreateTaskInput{
 		TeamID:      req.TeamID,
 		Title:       req.Title,
 		Description: req.Description,
@@ -63,7 +63,7 @@ func (h *taskHandler) create(c *fiber.Ctx) error {
 		return apierr.Response(c, err)
 	}
 
-	return c.Status(fiber.StatusCreated).JSON(model.ToTaskResponse(t))
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"id": id})
 }
 
 func (h *taskHandler) list(c *fiber.Ctx) error {
@@ -118,7 +118,12 @@ func (h *taskHandler) history(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid task id"})
 	}
 
-	records, err := h.svc.GetTaskHistory(c.UserContext(), taskID)
+	teamID, err := strconv.ParseInt(c.Query("team_id"), 10, 64)
+	if err != nil || teamID <= 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid team_id"})
+	}
+
+	records, err := h.svc.GetTaskHistory(c.UserContext(), taskID, teamID)
 	if err != nil {
 		return apierr.Response(c, err)
 	}

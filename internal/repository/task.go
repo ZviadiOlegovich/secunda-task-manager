@@ -7,16 +7,25 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/rs/zerolog"
 	"github.com/zoshc/secunda-task-manager/internal/services/errs"
 	"github.com/zoshc/secunda-task-manager/internal/services/task"
 )
 
-type taskRepository struct {
-	db *sql.DB
+type taskCache interface {
+	GetVersion(ctx context.Context, teamID int64) (int64, error)
+	GetTaskList(ctx context.Context, teamID, ver int64, filterKey string) ([]*task.Task, error)
+	SetTaskListIfVersion(ctx context.Context, teamID, ver int64, filterKey string, tasks []*task.Task) error
+	IncrVersion(ctx context.Context, teamID int64) error
 }
 
-func NewTaskRepository(db *sql.DB) *taskRepository {
-	return &taskRepository{db: db}
+type taskRepository struct {
+	db    *sql.DB
+	cache taskCache
+}
+
+func NewTaskRepository(db *sql.DB, cache taskCache) *taskRepository {
+	return &taskRepository{db: db, cache: cache}
 }
 
 func (r *taskRepository) Create(ctx context.Context, t *task.Task) (int64, error) {
@@ -28,7 +37,14 @@ func (r *taskRepository) Create(ctx context.Context, t *task.Task) (int64, error
 	if err != nil {
 		return 0, err
 	}
-	return result.LastInsertId()
+	id, err := result.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+	if err := r.cache.IncrVersion(ctx, t.TeamID); err != nil {
+		zerolog.Ctx(ctx).Warn().Err(err).Msg("cache incr version")
+	}
+	return id, nil
 }
 
 func (r *taskRepository) GetByID(ctx context.Context, id int64) (*task.Task, error) {
@@ -85,10 +101,30 @@ func (r *taskRepository) UpdateWithHistory(ctx context.Context, t *task.Task, hi
 		return err
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	if err := r.cache.IncrVersion(ctx, t.TeamID); err != nil {
+		zerolog.Ctx(ctx).Warn().Err(err).Msg("cache incr version")
+	}
+	return nil
 }
 
 func (r *taskRepository) List(ctx context.Context, filter task.ListFilter) ([]*task.Task, error) {
+	logger := zerolog.Ctx(ctx)
+	key := filter.FilterKey()
+
+	ver, cacheErr := r.cache.GetVersion(ctx, filter.TeamID)
+	if cacheErr != nil {
+		logger.Warn().Err(cacheErr).Msg("cache get version")
+	} else {
+		if cached, err := r.cache.GetTaskList(ctx, filter.TeamID, ver, key); err != nil {
+			logger.Warn().Err(err).Msg("cache get task list")
+		} else if cached != nil {
+			return cached, nil
+		}
+	}
+
 	wb := newWhereBuilder(4) // 1 обязательный + 3 опциональных
 	wb.add("team_id = ?", filter.TeamID)
 	if filter.Status != nil {
@@ -134,7 +170,17 @@ func (r *taskRepository) List(ctx context.Context, filter task.ListFilter) ([]*t
 		}
 		tasks = append(tasks, t)
 	}
-	return tasks, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	if cacheErr == nil {
+		if werr := r.cache.SetTaskListIfVersion(ctx, filter.TeamID, ver, key, tasks); werr != nil {
+			logger.Warn().Err(werr).Msg("cache set task list")
+		}
+	}
+
+	return tasks, nil
 }
 
 func (r *taskRepository) ListHistory(ctx context.Context, taskID int64) ([]task.HistoryRecord, error) {

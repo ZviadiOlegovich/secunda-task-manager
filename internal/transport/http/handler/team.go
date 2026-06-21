@@ -13,7 +13,7 @@ import (
 )
 
 type TeamService interface {
-	CreateTeam(ctx context.Context, userID int64, name string) (*team.Team, error)
+	CreateTeam(ctx context.Context, userID int64, name string) (int64, error)
 	ListTeams(ctx context.Context, userID int64) ([]*team.Team, error)
 	InviteUser(ctx context.Context, invite team.InviteUserInput) error
 }
@@ -47,12 +47,12 @@ func (h *teamHandler) create(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 	}
 
-	t, err := h.svc.CreateTeam(c.UserContext(), userID, req.Name)
+	id, err := h.svc.CreateTeam(c.UserContext(), userID, req.Name)
 	if err != nil {
 		return apierr.Response(c, err)
 	}
 
-	return c.Status(fiber.StatusCreated).JSON(model.ToTeamResponse(t))
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"id": id})
 }
 
 func (h *teamHandler) list(c *fiber.Ctx) error {
