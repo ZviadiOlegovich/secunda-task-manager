@@ -23,8 +23,8 @@ func NewServer(cfg config.Config, routers ...router.Router) *server {
 		fiber: fiber.New(fiber.Config{
 			CaseSensitive: true,
 			AppName:       cfg.Server.ServiceName,
-			ReadTimeout:   30 * time.Second,
-			WriteTimeout:  30 * time.Second,
+			ReadTimeout:   15 * time.Second,
+			WriteTimeout:  15 * time.Second,
 		}),
 	}
 
