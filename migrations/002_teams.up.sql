@@ -5,7 +5,6 @@ CREATE TABLE IF NOT EXISTS teams (
     created_at DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     PRIMARY KEY (id),
-    INDEX      idx_teams_created_by (created_by),
     CONSTRAINT fk_teams_created_by FOREIGN KEY (created_by) REFERENCES users (id)
 );
 
