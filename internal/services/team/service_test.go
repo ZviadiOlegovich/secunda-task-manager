@@ -16,6 +16,15 @@ type mockRepo struct {
 	getMemberFn       func(ctx context.Context, teamID, userID int64) (*TeamMember, error)
 }
 
+type mockEmailSvc struct{}
+
+func (m *mockEmailSvc) SendInvite(_ context.Context, _, _ string) error { return nil }
+
+var okEmail = &mockEmailSvc{}
+var okTeamByID = func(_ context.Context, _ int64) (*Team, error) {
+	return &Team{ID: 1, Name: "Alpha"}, nil
+}
+
 func (m *mockRepo) CreateWithOwner(ctx context.Context, t *Team, ownerID int64) (int64, error) {
 	return m.createWithOwnerFn(ctx, t, ownerID)
 }
@@ -68,7 +77,7 @@ func TestService_CreateTeam(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc := New(tt.repo)
+			svc := New(tt.repo, okEmail)
 			team, err := svc.CreateTeam(context.Background(), 1, tt.input)
 			if !errors.Is(err, tt.wantErr) {
 				t.Errorf("expected %v, got %v", tt.wantErr, err)
@@ -99,6 +108,7 @@ func TestService_InviteUser(t *testing.T) {
 			input: input(RoleMember),
 			repo: &mockRepo{
 				getMemberFn: func(_ context.Context, _, _ int64) (*TeamMember, error) { return member(RoleOwner), nil },
+				getByIDFn:   okTeamByID,
 				addMemberFn: func(_ context.Context, _ *TeamMember) error { return nil },
 			},
 		},
@@ -107,6 +117,7 @@ func TestService_InviteUser(t *testing.T) {
 			input: input(RoleAdmin),
 			repo: &mockRepo{
 				getMemberFn: func(_ context.Context, _, _ int64) (*TeamMember, error) { return member(RoleOwner), nil },
+				getByIDFn:   okTeamByID,
 				addMemberFn: func(_ context.Context, _ *TeamMember) error { return nil },
 			},
 		},
@@ -115,6 +126,7 @@ func TestService_InviteUser(t *testing.T) {
 			input: input(RoleMember),
 			repo: &mockRepo{
 				getMemberFn: func(_ context.Context, _, _ int64) (*TeamMember, error) { return member(RoleAdmin), nil },
+				getByIDFn:   okTeamByID,
 				addMemberFn: func(_ context.Context, _ *TeamMember) error { return nil },
 			},
 		},
@@ -141,6 +153,7 @@ func TestService_InviteUser(t *testing.T) {
 			input: input(RoleMember),
 			repo: &mockRepo{
 				getMemberFn: func(_ context.Context, _, _ int64) (*TeamMember, error) { return member(RoleOwner), nil },
+				getByIDFn:   okTeamByID,
 				addMemberFn: func(_ context.Context, _ *TeamMember) error { return ErrAlreadyMember },
 			},
 			wantErr: ErrAlreadyMember,
@@ -149,7 +162,7 @@ func TestService_InviteUser(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc := New(tt.repo)
+			svc := New(tt.repo, okEmail)
 			err := svc.InviteUser(context.Background(), tt.input)
 			if !errors.Is(err, tt.wantErr) {
 				t.Errorf("expected %v, got %v", tt.wantErr, err)

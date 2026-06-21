@@ -4,24 +4,27 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/zoshc/secunda-task-manager/internal/services/errs"
 )
 
 type Service struct {
-	repo Repository
+	repo     Repository
+	emailSvc EmailService
 }
 
-func New(repo Repository) *Service {
-	return &Service{repo: repo}
+func New(repo Repository, emailSvc EmailService) *Service {
+	return &Service{repo: repo, emailSvc: emailSvc}
 }
 
 type InviteUserInput struct {
-	TeamID    int64
-	InviterID int64
-	InviteeID int64
-	Role      Role
+	TeamID       int64
+	InviterID    int64
+	InviteeID    int64
+	InviteeEmail string
+	Role         Role
 }
 
 func (s *Service) CreateTeam(ctx context.Context, userID int64, name string) (*Team, error) {
@@ -63,6 +66,12 @@ func (s *Service) InviteUser(ctx context.Context, invite InviteUserInput) error 
 		return ErrPermissionDenied
 	}
 
+	t, err := s.repo.GetByID(ctx, invite.TeamID)
+	if err != nil {
+		logger.Error().Err(err).Msg("get team")
+		return err
+	}
+
 	if err := s.repo.AddMember(ctx, &TeamMember{
 		TeamID: invite.TeamID,
 		UserID: invite.InviteeID,
@@ -74,6 +83,17 @@ func (s *Service) InviteUser(ctx context.Context, invite InviteUserInput) error 
 		logger.Error().Err(err).Msg("add member")
 		return err
 	}
+
+	// Требования не описывают поведение email-сервиса и гарантии доставки.
+	// Fire-and-forget: если письмо не отправится — приглашение всё равно создано.
+	// Для гарантированной доставки нужен transactional outbox + брокер (например, Kafka).
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := s.emailSvc.SendInvite(ctx, invite.InviteeEmail, t.Name); err != nil {
+			logger.Error().Err(err).Str("to", invite.InviteeEmail).Msg("send invite email")
+		}
+	}()
 
 	return nil
 }

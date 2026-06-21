@@ -12,6 +12,7 @@ type CreateTeamRequest struct {
 
 type InviteRequest struct {
 	UserID int64     `json:"user_id"`
+	Email  string    `json:"email"`
 	Role   team.Role `json:"role"`
 }
 

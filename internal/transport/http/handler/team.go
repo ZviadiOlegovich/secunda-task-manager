@@ -90,10 +90,11 @@ func (h *teamHandler) invite(c *fiber.Ctx) error {
 	}
 
 	if err := h.svc.InviteUser(c.UserContext(), team.InviteUserInput{
-		TeamID:    teamID,
-		InviterID: userID,
-		InviteeID: req.UserID,
-		Role:      req.Role,
+		TeamID:       teamID,
+		InviterID:    userID,
+		InviteeID:    req.UserID,
+		InviteeEmail: req.Email,
+		Role:         req.Role,
 	}); err != nil {
 		return apierr.Response(c, err)
 	}

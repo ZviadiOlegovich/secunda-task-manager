@@ -9,3 +9,7 @@ type Repository interface {
 	GetByUserID(ctx context.Context, userID int64) ([]*Team, error)
 	GetMember(ctx context.Context, teamID, userID int64) (*TeamMember, error)
 }
+
+type EmailService interface {
+	SendInvite(ctx context.Context, to, teamName string) error
+}

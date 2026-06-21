@@ -13,6 +13,7 @@ import (
 	"github.com/zoshc/secunda-task-manager/internal/closer"
 	"github.com/zoshc/secunda-task-manager/internal/config"
 	"github.com/zoshc/secunda-task-manager/internal/repository"
+	"github.com/zoshc/secunda-task-manager/internal/services/email"
 	"github.com/zoshc/secunda-task-manager/internal/services/stats"
 	"github.com/zoshc/secunda-task-manager/internal/services/task"
 	"github.com/zoshc/secunda-task-manager/internal/services/team"
@@ -61,8 +62,10 @@ func main() {
 	userSvc := user.New(userRepo, jwtProvider)
 	authHandler := handler.NewAuthHandler(userSvc)
 
+	emailSvc := email.NewCBService(email.NewMock())
+
 	teamRepo := repository.NewTeamRepository(db)
-	teamSvc := team.New(teamRepo)
+	teamSvc := team.New(teamRepo, emailSvc)
 	teamHandler := handler.NewTeamHandler(authMiddleware, teamSvc)
 
 	taskRepo := repository.NewTaskRepository(db)

@@ -26,7 +26,8 @@ func Response(c *fiber.Ctx, err error) error {
 
 func statusCode(err error) int {
 	switch {
-	case errors.Is(err, errs.ErrNotFound):
+	case errors.Is(err, errs.ErrNotFound),
+		errors.Is(err, team.ErrInviteeNotFound):
 		return http.StatusNotFound
 	case errors.Is(err, user.ErrEmailTaken),
 		errors.Is(err, team.ErrAlreadyMember):

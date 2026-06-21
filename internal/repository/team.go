@@ -52,8 +52,13 @@ func (r *teamRepository) AddMember(ctx context.Context, m *team.TeamMember) erro
 	_, err := r.db.ExecContext(ctx, q, m.TeamID, m.UserID, m.Role)
 	if err != nil {
 		var mysqlErr *mysql.MySQLError
-		if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
-			return team.ErrAlreadyMember
+		if errors.As(err, &mysqlErr) {
+			switch mysqlErr.Number {
+			case 1062:
+				return team.ErrAlreadyMember
+			case 1452:
+				return team.ErrInviteeNotFound
+			}
 		}
 		return err
 	}
