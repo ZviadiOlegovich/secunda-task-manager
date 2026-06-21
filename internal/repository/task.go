@@ -125,7 +125,7 @@ func (r *taskRepository) List(ctx context.Context, filter task.ListFilter) ([]*t
 		}
 	}
 
-	wb := newWhereBuilder(4) // 1 обязательный + 3 опциональных
+	wb := newWhereBuilder(4)
 	wb.add("team_id = ?", filter.TeamID)
 	if filter.Status != nil {
 		wb.add("status = ?", *filter.Status)
