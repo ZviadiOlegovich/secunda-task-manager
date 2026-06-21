@@ -46,6 +46,7 @@ func (m *mockRepo) GetMember(ctx context.Context, teamID, userID int64) (*TeamMe
 }
 
 func TestService_CreateTeam(t *testing.T) {
+	errDB := errors.New("db error")
 	okRepo := &mockRepo{
 		createWithOwnerFn: func(_ context.Context, _ *Team, _ int64) (int64, error) { return 1, nil },
 	}
@@ -73,6 +74,14 @@ func TestService_CreateTeam(t *testing.T) {
 			repo:    okRepo,
 			wantErr: ErrInvalidName,
 		},
+		{
+			name:  "repo error propagated",
+			input: "Alpha",
+			repo: &mockRepo{
+				createWithOwnerFn: func(_ context.Context, _ *Team, _ int64) (int64, error) { return 0, errDB },
+			},
+			wantErr: errDB,
+		},
 	}
 
 	for _, tt := range tests {
@@ -90,6 +99,7 @@ func TestService_CreateTeam(t *testing.T) {
 }
 
 func TestService_InviteUser(t *testing.T) {
+	errDB := errors.New("db error")
 	member := func(role Role) *TeamMember {
 		return &TeamMember{TeamID: 1, UserID: 10, Role: role}
 	}
@@ -158,6 +168,34 @@ func TestService_InviteUser(t *testing.T) {
 			},
 			wantErr: ErrAlreadyMember,
 		},
+		{
+			name:  "get inviter repo error",
+			input: input(RoleMember),
+			repo: &mockRepo{
+				getMemberFn: func(_ context.Context, _, _ int64) (*TeamMember, error) { return nil, errDB },
+			},
+			wantErr: errDB,
+		},
+		{
+			name:  "get team repo error",
+			input: input(RoleMember),
+			repo: &mockRepo{
+				getMemberFn: func(_ context.Context, _, _ int64) (*TeamMember, error) { return member(RoleOwner), nil },
+				getByIDFn:   func(_ context.Context, _ int64) (*Team, error) { return nil, errDB },
+				addMemberFn: func(_ context.Context, _ *TeamMember) error { return nil },
+			},
+			wantErr: errDB,
+		},
+		{
+			name:  "add member repo error",
+			input: input(RoleMember),
+			repo: &mockRepo{
+				getMemberFn: func(_ context.Context, _, _ int64) (*TeamMember, error) { return member(RoleOwner), nil },
+				getByIDFn:   okTeamByID,
+				addMemberFn: func(_ context.Context, _ *TeamMember) error { return errDB },
+			},
+			wantErr: errDB,
+		},
 	}
 
 	for _, tt := range tests {
@@ -166,6 +204,46 @@ func TestService_InviteUser(t *testing.T) {
 			err := svc.InviteUser(context.Background(), tt.input)
 			if !errors.Is(err, tt.wantErr) {
 				t.Errorf("expected %v, got %v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+func TestService_ListTeams(t *testing.T) {
+	errDB := errors.New("db error")
+	teams := []*Team{{ID: 1, Name: "Alpha"}, {ID: 2, Name: "Beta"}}
+
+	tests := []struct {
+		name    string
+		repo    Repository
+		wantLen int
+		wantErr error
+	}{
+		{
+			name: "success",
+			repo: &mockRepo{
+				getByUserIDFn: func(_ context.Context, _ int64) ([]*Team, error) { return teams, nil },
+			},
+			wantLen: 2,
+		},
+		{
+			name: "repo error propagated",
+			repo: &mockRepo{
+				getByUserIDFn: func(_ context.Context, _ int64) ([]*Team, error) { return nil, errDB },
+			},
+			wantErr: errDB,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := New(tt.repo, okEmail)
+			got, err := svc.ListTeams(context.Background(), 1)
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("expected %v, got %v", tt.wantErr, err)
+			}
+			if tt.wantErr == nil && len(got) != tt.wantLen {
+				t.Errorf("want %d teams, got %d", tt.wantLen, len(got))
 			}
 		})
 	}

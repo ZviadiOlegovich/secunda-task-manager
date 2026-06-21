@@ -51,6 +51,8 @@ func (m *mockTokens) ValidateRefresh(token string) (int64, error) {
 }
 
 var (
+	errToken = errors.New("token error")
+
 	okTokens = &mockTokens{
 		generateAccessFn:  func(_ int64) (string, error) { return "access-token", nil },
 		generateRefreshFn: func(_ int64) (string, error) { return "refresh-token", nil },
@@ -143,12 +145,86 @@ func TestService_Login(t *testing.T) {
 			tokens:  okTokens,
 			wantErr: ErrInvalidCredentials,
 		},
+		{
+			name:  "token generation error",
+			input: LoginInput{Email: "test@example.com", Password: "password123"},
+			repo:  okRepo,
+			tokens: &mockTokens{
+				generateAccessFn:  func(_ int64) (string, error) { return "", errToken },
+				generateRefreshFn: func(_ int64) (string, error) { return "", nil },
+				validateRefreshFn: func(_ string) (int64, error) { return 0, nil },
+			},
+			wantErr: errToken,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			svc := New(tt.repo, tt.tokens)
 			tokens, err := svc.Login(context.Background(), tt.input)
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("expected %v, got %v", tt.wantErr, err)
+			}
+			if tt.wantErr == nil && tokens == nil {
+				t.Error("expected tokens, got nil")
+			}
+		})
+	}
+}
+
+func TestService_Refresh(t *testing.T) {
+	existingUser := &User{ID: 1, Email: "test@example.com"}
+
+	okRepo := &mockRepo{
+		getByRefreshTokenFn:  func(_ context.Context, _ string) (*User, error) { return existingUser, nil },
+		updateRefreshTokenFn: func(_ context.Context, _ int64, _ string) error { return nil },
+	}
+
+	errInvalidToken := errors.New("invalid token")
+
+	tests := []struct {
+		name    string
+		repo    Repository
+		tokens  TokenProvider
+		wantErr error
+	}{
+		{
+			name:   "success",
+			repo:   okRepo,
+			tokens: okTokens,
+		},
+		{
+			name: "invalid refresh token",
+			repo: okRepo,
+			tokens: &mockTokens{
+				validateRefreshFn: func(_ string) (int64, error) { return 0, errInvalidToken },
+			},
+			wantErr: ErrInvalidCredentials,
+		},
+		{
+			name: "user not found by token",
+			repo: &mockRepo{
+				getByRefreshTokenFn: func(_ context.Context, _ string) (*User, error) { return nil, errs.ErrNotFound },
+			},
+			tokens:  okTokens,
+			wantErr: ErrInvalidCredentials,
+		},
+		{
+			name: "token generation error",
+			repo: okRepo,
+			tokens: &mockTokens{
+				validateRefreshFn: func(_ string) (int64, error) { return 1, nil },
+				generateAccessFn:  func(_ int64) (string, error) { return "", errToken },
+				generateRefreshFn: func(_ int64) (string, error) { return "", nil },
+			},
+			wantErr: errToken,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := New(tt.repo, tt.tokens)
+			tokens, err := svc.Refresh(context.Background(), "some-refresh-token")
 			if !errors.Is(err, tt.wantErr) {
 				t.Errorf("expected %v, got %v", tt.wantErr, err)
 			}

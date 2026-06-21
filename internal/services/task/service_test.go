@@ -199,6 +199,22 @@ func TestService_CreateTask(t *testing.T) {
 			teamRepo: notMemberTeamRepo,
 			wantErr:  ErrNotMember,
 		},
+		{
+			name:  "membership check repo error",
+			input: CreateTaskInput{TeamID: 1, Title: "Fix bug", Priority: PriorityMedium, CreatedBy: 1},
+			repo:  okRepo,
+			teamRepo: &mockTeamRepo{
+				areMembersOfFn: func(_ context.Context, _ int64, _ []int64) error { return errDB },
+			},
+			wantErr: errDB,
+		},
+		{
+			name:     "repo create error",
+			input:    CreateTaskInput{TeamID: 1, Title: "Fix bug", Priority: PriorityMedium, CreatedBy: 1},
+			repo:     &mockRepo{createFn: func(_ context.Context, _ *Task) (int64, error) { return 0, errDB }},
+			teamRepo: memberTeamRepo,
+			wantErr:  errDB,
+		},
 	}
 
 	for _, tt := range tests {
@@ -364,6 +380,25 @@ func TestService_UpdateTask(t *testing.T) {
 			repo:     updateRepo(taskForUpdate(1)),
 			teamRepo: memberTeamRepo,
 			wantErr:  ErrInvalidStatus,
+		},
+		{
+			name:  "get by id repo error",
+			input: validInput(1),
+			repo: &mockRepo{
+				getByIDFn: func(_ context.Context, _ int64) (*Task, error) { return nil, errDB },
+			},
+			teamRepo: memberTeamRepo,
+			wantErr:  errDB,
+		},
+		{
+			name:  "update with history repo error",
+			input: validInput(1),
+			repo: &mockRepo{
+				getByIDFn:           func(_ context.Context, _ int64) (*Task, error) { return taskForUpdate(1), nil },
+				updateWithHistoryFn: func(_ context.Context, _ *Task, _ []TaskHistoryEntry) error { return errDB },
+			},
+			teamRepo: memberTeamRepo,
+			wantErr:  errDB,
 		},
 	}
 
