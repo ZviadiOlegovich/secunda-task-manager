@@ -89,21 +89,8 @@ func (s *Service) UpdateTask(ctx context.Context, update UpdateTaskInput) error 
 	return nil
 }
 
-func (s *Service) GetTaskHistory(ctx context.Context, userID, taskID int64) ([]HistoryRecord, error) {
+func (s *Service) GetTaskHistory(ctx context.Context, taskID int64) ([]HistoryRecord, error) {
 	logger := zerolog.Ctx(ctx)
-
-	t, err := s.repo.GetByID(ctx, taskID)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := s.teamRepo.AreMembersOf(ctx, t.TeamID, []int64{userID}); err != nil {
-		if errors.Is(err, errs.ErrNotFound) {
-			return nil, ErrNotMember
-		}
-		logger.Error().Err(err).Msg("check membership")
-		return nil, err
-	}
 
 	records, err := s.repo.ListHistory(ctx, taskID)
 	if err != nil {

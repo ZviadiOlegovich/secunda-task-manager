@@ -9,15 +9,15 @@ import (
 	"github.com/zoshc/secunda-task-manager/internal/services/task"
 )
 
-func newTestCache(t *testing.T) (*TaskCache, *miniredis.Miniredis) {
+func newTestCache(t *testing.T) *TaskCache {
 	t.Helper()
 	mr := miniredis.RunT(t)
 	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
-	return NewTaskCache(rdb), mr
+	return NewTaskCache(rdb)
 }
 
 func TestTaskCache_MissAndSet(t *testing.T) {
-	c, _ := newTestCache(t)
+	c := newTestCache(t)
 	ctx := context.Background()
 
 	ver, _ := c.GetVersion(ctx, 1)
@@ -41,7 +41,7 @@ func TestTaskCache_MissAndSet(t *testing.T) {
 }
 
 func TestTaskCache_IncrVersionInvalidates(t *testing.T) {
-	c, _ := newTestCache(t)
+	c := newTestCache(t)
 	ctx := context.Background()
 
 	ver, _ := c.GetVersion(ctx, 1)
@@ -62,7 +62,7 @@ func TestTaskCache_IncrVersionInvalidates(t *testing.T) {
 }
 
 func TestTaskCache_StaleWriteDoesNotPollute(t *testing.T) {
-	c, _ := newTestCache(t)
+	c := newTestCache(t)
 	ctx := context.Background()
 
 	ver, _ := c.GetVersion(ctx, 1)

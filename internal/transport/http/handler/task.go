@@ -16,7 +16,7 @@ type TaskService interface {
 	CreateTask(ctx context.Context, create task.CreateTaskInput) (int64, error)
 	ListTasks(ctx context.Context, filter task.ListFilter) ([]*task.Task, error)
 	UpdateTask(ctx context.Context, update task.UpdateTaskInput) error
-	GetTaskHistory(ctx context.Context, userID, taskID int64) ([]task.HistoryRecord, error)
+	GetTaskHistory(ctx context.Context, taskID int64) ([]task.HistoryRecord, error)
 }
 
 type taskHandler struct {
@@ -113,17 +113,12 @@ func (h *taskHandler) list(c *fiber.Ctx) error {
 }
 
 func (h *taskHandler) history(c *fiber.Ctx) error {
-	userID, ok := middleware.UserIDFromCtx(c)
-	if !ok {
-		return fiber.ErrUnauthorized
-	}
-
 	taskID, err := strconv.ParseInt(c.Params("id"), 10, 64)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid task id"})
 	}
 
-	records, err := h.svc.GetTaskHistory(c.UserContext(), userID, taskID)
+	records, err := h.svc.GetTaskHistory(c.UserContext(), taskID)
 	if err != nil {
 		return apierr.Response(c, err)
 	}

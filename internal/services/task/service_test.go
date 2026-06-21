@@ -44,6 +44,8 @@ func (m *mockTeamRepo) AreMembersOf(ctx context.Context, teamID int64, userIDs [
 	return m.areMembersOfFn(ctx, teamID, userIDs)
 }
 
+var errDB = errors.New("db error")
+
 var okRepo = &mockRepo{
 	createFn: func(_ context.Context, _ *Task) (int64, error) { return 1, nil },
 }
@@ -96,6 +98,15 @@ func TestService_ListTasks(t *testing.T) {
 			teamRepo: memberTeamRepo,
 			wantLen:  1,
 		},
+		{
+			name:  "repo error propagated",
+			input: ListFilter{TeamID: 1, RequestedBy: 1, Page: 1, Limit: 20},
+			repo: &mockRepo{
+				listFn: func(_ context.Context, _ ListFilter) ([]*Task, error) { return nil, errDB },
+			},
+			teamRepo: memberTeamRepo,
+			wantErr:  errDB,
+		},
 	}
 
 	for _, tt := range tests {
@@ -138,9 +149,16 @@ func TestService_CreateTask(t *testing.T) {
 			teamRepo: memberTeamRepo,
 		},
 		{
-			name:     "default priority when empty",
-			input:    CreateTaskInput{TeamID: 1, Title: "Fix bug", CreatedBy: 1},
-			repo:     okRepo,
+			name: "default priority when empty",
+			input: CreateTaskInput{TeamID: 1, Title: "Fix bug", CreatedBy: 1},
+			repo: &mockRepo{
+				createFn: func(_ context.Context, t *Task) (int64, error) {
+					if t.Priority != PriorityMedium {
+						return 0, errors.New("expected default priority medium")
+					}
+					return 1, nil
+				},
+			},
 			teamRepo: memberTeamRepo,
 		},
 		{
@@ -202,75 +220,40 @@ func TestService_GetTaskHistory(t *testing.T) {
 		{ID: 1, TaskID: 10, UserID: 1, Field: "title", OldValue: nil, NewValue: strPtr("new")},
 	}
 
-	historyRepo := func(task *Task) *mockRepo {
-		return &mockRepo{
-			getByIDFn:     func(_ context.Context, _ int64) (*Task, error) { return task, nil },
-			listHistoryFn: func(_ context.Context, _ int64) ([]HistoryRecord, error) { return records, nil },
-		}
-	}
-
 	tests := []struct {
-		name     string
-		taskID   int64
-		userID   int64
-		repo     Repository
-		teamRepo TeamRepository
-		wantLen  int
-		wantErr  error
+		name    string
+		taskID  int64
+		repo    Repository
+		wantLen int
+		wantErr error
 	}{
 		{
-			name:     "success",
-			taskID:   10,
-			userID:   1,
-			repo:     historyRepo(taskForUpdate(1)),
-			teamRepo: memberTeamRepo,
-			wantLen:  1,
-		},
-		{
-			name:     "user not in team",
-			taskID:   10,
-			userID:   99,
-			repo:     historyRepo(taskForUpdate(1)),
-			teamRepo: notMemberTeamRepo,
-			wantErr:  ErrNotMember,
-		},
-		{
-			name:   "task not found",
-			taskID: 999,
-			userID: 1,
-			repo: &mockRepo{
-				getByIDFn: func(_ context.Context, _ int64) (*Task, error) { return nil, errs.ErrNotFound },
-			},
-			teamRepo: memberTeamRepo,
-			wantErr:  errs.ErrNotFound,
-		},
-		{
-			name:   "repo error on list history",
+			name:   "success",
 			taskID: 10,
-			userID: 1,
 			repo: &mockRepo{
-				getByIDFn:     func(_ context.Context, _ int64) (*Task, error) { return taskForUpdate(1), nil },
-				listHistoryFn: func(_ context.Context, _ int64) ([]HistoryRecord, error) { return nil, errors.New("db error") },
+				listHistoryFn: func(_ context.Context, _ int64) ([]HistoryRecord, error) { return records, nil },
 			},
-			teamRepo: memberTeamRepo,
-			wantErr:  errors.New("db error"),
+			wantLen: 1,
+		},
+		{
+			name:   "repo error propagated",
+			taskID: 10,
+			repo: &mockRepo{
+				listHistoryFn: func(_ context.Context, _ int64) ([]HistoryRecord, error) { return nil, errDB },
+			},
+			wantErr: errDB,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc := New(tt.repo, tt.teamRepo)
-			got, err := svc.GetTaskHistory(context.Background(), tt.userID, tt.taskID)
-			if tt.wantErr != nil && err == nil {
-				t.Errorf("want error, got nil")
+			svc := New(tt.repo, memberTeamRepo)
+			got, err := svc.GetTaskHistory(context.Background(), tt.taskID)
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("want %v, got %v", tt.wantErr, err)
 			}
-			if tt.wantErr == nil {
-				if err != nil {
-					t.Errorf("unexpected error: %v", err)
-				}
-				if len(got) != tt.wantLen {
-					t.Errorf("want %d records, got %d", tt.wantLen, len(got))
-				}
+			if tt.wantErr == nil && len(got) != tt.wantLen {
+				t.Errorf("want %d records, got %d", tt.wantLen, len(got))
 			}
 		})
 	}
@@ -305,7 +288,7 @@ func TestService_UpdateTask(t *testing.T) {
 		wantErr  error
 	}{
 		{
-			name:     "member updates any task",
+			name:     "success",
 			input:    validInput(99),
 			repo:     updateRepo(taskForUpdate(1)),
 			teamRepo: memberTeamRepo,
