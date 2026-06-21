@@ -210,43 +210,57 @@ func TestService_GetTaskHistory(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		taskID  int64
-		teamID  int64
-		repo    Repository
-		wantLen int
-		wantErr error
+		name     string
+		taskID   int64
+		userID   int64
+		repo     Repository
+		teamRepo TeamRepository
+		wantLen  int
+		wantErr  error
 	}{
 		{
-			name:    "success",
-			taskID:  10,
-			teamID:  1,
-			repo:    historyRepo(taskForUpdate(1)),
-			wantLen: 1,
+			name:     "success",
+			taskID:   10,
+			userID:   1,
+			repo:     historyRepo(taskForUpdate(1)),
+			teamRepo: memberTeamRepo,
+			wantLen:  1,
 		},
 		{
-			name:   "wrong team returns not found",
-			taskID: 10,
-			teamID: 99,
-			repo:   historyRepo(taskForUpdate(1)),
-			wantErr: errs.ErrNotFound,
+			name:     "user not in team",
+			taskID:   10,
+			userID:   99,
+			repo:     historyRepo(taskForUpdate(1)),
+			teamRepo: notMemberTeamRepo,
+			wantErr:  ErrNotMember,
+		},
+		{
+			name:   "task not found",
+			taskID: 999,
+			userID: 1,
+			repo: &mockRepo{
+				getByIDFn: func(_ context.Context, _ int64) (*Task, error) { return nil, errs.ErrNotFound },
+			},
+			teamRepo: memberTeamRepo,
+			wantErr:  errs.ErrNotFound,
 		},
 		{
 			name:   "repo error on list history",
 			taskID: 10,
-			teamID: 1,
+			userID: 1,
 			repo: &mockRepo{
 				getByIDFn:     func(_ context.Context, _ int64) (*Task, error) { return taskForUpdate(1), nil },
 				listHistoryFn: func(_ context.Context, _ int64) ([]HistoryRecord, error) { return nil, errors.New("db error") },
 			},
-			wantErr: errors.New("db error"),
+			teamRepo: memberTeamRepo,
+			wantErr:  errors.New("db error"),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc := New(tt.repo, memberTeamRepo)
-			got, err := svc.GetTaskHistory(context.Background(), tt.taskID, tt.teamID)
+			svc := New(tt.repo, tt.teamRepo)
+			got, err := svc.GetTaskHistory(context.Background(), tt.userID, tt.taskID)
 			if tt.wantErr != nil && err == nil {
 				t.Errorf("want error, got nil")
 			}

@@ -23,10 +23,10 @@ type teamHandler struct {
 	svc        TeamService
 }
 
-func NewTeamHandler(auth fiber.Handler, svc TeamService) *teamHandler {
+func NewTeamHandler(auth, userRateLimit fiber.Handler, svc TeamService) *teamHandler {
 	h := &teamHandler{svc: svc}
 	h.makeRouter = func(r fiber.Router) {
-		g := r.Group("/teams", auth)
+		g := r.Group("/teams", auth, userRateLimit)
 		g.Post("/", h.create)
 		g.Get("/", h.list)
 		g.Post("/:id/invite", h.invite)

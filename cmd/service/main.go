@@ -18,9 +18,9 @@ import (
 	"github.com/zoshc/secunda-task-manager/internal/services/task"
 	"github.com/zoshc/secunda-task-manager/internal/services/team"
 	"github.com/zoshc/secunda-task-manager/internal/services/user"
-	"github.com/zoshc/secunda-task-manager/internal/transport/http/middleware"
 	"github.com/zoshc/secunda-task-manager/internal/transport/http"
 	"github.com/zoshc/secunda-task-manager/internal/transport/http/handler"
+	"github.com/zoshc/secunda-task-manager/internal/transport/http/middleware"
 	"github.com/zoshc/secunda-task-manager/internal/transport/http/router"
 	"github.com/zoshc/secunda-task-manager/pkg/jwt"
 	"github.com/zoshc/secunda-task-manager/pkg/logger"
@@ -58,6 +58,9 @@ func main() {
 	jwtProvider := jwt.NewProvider(cfg.JWT)
 	authMiddleware := middleware.Auth(jwtProvider)
 
+	rateLimiter := middleware.NewRateLimiter(rdb)
+	userRateLimit := rateLimiter.LimitByUserID(100, time.Minute)
+
 	userRepo := repository.NewUserRepository(db)
 	userSvc := user.New(userRepo, jwtProvider)
 	authHandler := handler.NewAuthHandler(userSvc)
@@ -66,16 +69,16 @@ func main() {
 
 	teamRepo := repository.NewTeamRepository(db)
 	teamSvc := team.New(teamRepo, emailSvc)
-	teamHandler := handler.NewTeamHandler(authMiddleware, teamSvc)
+	teamHandler := handler.NewTeamHandler(authMiddleware, userRateLimit, teamSvc)
 
 	taskCache := cache.NewTaskCache(rdb)
 	taskRepo := repository.NewTaskRepository(db, taskCache)
 	taskSvc := task.New(taskRepo, teamRepo)
-	taskHandler := handler.NewTaskHandler(authMiddleware, taskSvc)
+	taskHandler := handler.NewTaskHandler(authMiddleware, userRateLimit, taskSvc)
 
 	statsRepo := repository.NewStatsRepository(db)
 	statsSvc := stats.New(statsRepo)
-	statsHandler := handler.NewStatsHandler(authMiddleware, statsSvc)
+	statsHandler := handler.NewStatsHandler(authMiddleware, userRateLimit, statsSvc)
 
 	srv := http.NewServer(*cfg,
 		router.NewRouter(authHandler.Router()),

@@ -16,7 +16,7 @@ type TaskService interface {
 	CreateTask(ctx context.Context, create task.CreateTaskInput) (int64, error)
 	ListTasks(ctx context.Context, filter task.ListFilter) ([]*task.Task, error)
 	UpdateTask(ctx context.Context, update task.UpdateTaskInput) error
-	GetTaskHistory(ctx context.Context, taskID, teamID int64) ([]task.HistoryRecord, error)
+	GetTaskHistory(ctx context.Context, userID, taskID int64) ([]task.HistoryRecord, error)
 }
 
 type taskHandler struct {
@@ -24,10 +24,10 @@ type taskHandler struct {
 	svc        TaskService
 }
 
-func NewTaskHandler(auth fiber.Handler, svc TaskService) *taskHandler {
+func NewTaskHandler(auth, userRateLimit fiber.Handler, svc TaskService) *taskHandler {
 	h := &taskHandler{svc: svc}
 	h.makeRouter = func(r fiber.Router) {
-		g := r.Group("/tasks", auth)
+		g := r.Group("/tasks", auth, userRateLimit)
 		g.Post("/", h.create)
 		g.Get("/", h.list)
 		g.Put("/:id", h.update)
@@ -113,17 +113,17 @@ func (h *taskHandler) list(c *fiber.Ctx) error {
 }
 
 func (h *taskHandler) history(c *fiber.Ctx) error {
+	userID, ok := middleware.UserIDFromCtx(c)
+	if !ok {
+		return fiber.ErrUnauthorized
+	}
+
 	taskID, err := strconv.ParseInt(c.Params("id"), 10, 64)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid task id"})
 	}
 
-	teamID, err := strconv.ParseInt(c.Query("team_id"), 10, 64)
-	if err != nil || teamID <= 0 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid team_id"})
-	}
-
-	records, err := h.svc.GetTaskHistory(c.UserContext(), taskID, teamID)
+	records, err := h.svc.GetTaskHistory(c.UserContext(), userID, taskID)
 	if err != nil {
 		return apierr.Response(c, err)
 	}

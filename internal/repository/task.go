@@ -137,15 +137,7 @@ func (r *taskRepository) List(ctx context.Context, filter task.ListFilter) ([]*t
 		wb.add("assignee_id = ?", *filter.AssigneeID)
 	}
 
-	limit := filter.Limit
-	if limit <= 0 {
-		limit = 20
-	}
-	page := filter.Page
-	if page <= 0 {
-		page = 1
-	}
-	offset := (page - 1) * limit
+	offset := (filter.Page - 1) * filter.Limit
 
 	q := fmt.Sprintf(
 		`SELECT id, team_id, title, description, status, priority, estimate, assignee_id, created_by, due_date, created_at, updated_at
@@ -153,7 +145,7 @@ func (r *taskRepository) List(ctx context.Context, filter task.ListFilter) ([]*t
 		wb.clause(),
 	)
 
-	rows, err := r.db.QueryContext(ctx, q, append(wb.args, limit, offset)...)
+	rows, err := r.db.QueryContext(ctx, q, append(wb.args, filter.Limit, offset)...)
 	if err != nil {
 		return nil, err
 	}

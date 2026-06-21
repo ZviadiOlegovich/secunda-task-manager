@@ -36,10 +36,10 @@ type TopUserResponse struct {
 	Rank      int    `json:"rank"`
 }
 
-func NewStatsHandler(auth fiber.Handler, svc StatsService) *statsHandler {
+func NewStatsHandler(auth, userRateLimit fiber.Handler, svc StatsService) *statsHandler {
 	h := &statsHandler{svc: svc}
 	h.makeRouter = func(r fiber.Router) {
-		g := r.Group("/stats", auth)
+		g := r.Group("/stats", auth, userRateLimit)
 		g.Get("/teams", h.teams)
 		g.Get("/top-users", h.topUsers)
 		g.Get("/integrity", h.integrity)

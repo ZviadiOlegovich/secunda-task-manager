@@ -120,6 +120,15 @@ type ListFilter struct {
 	Limit       int
 }
 
+func (f *ListFilter) normalize() {
+	if f.Page <= 0 {
+		f.Page = 1
+	}
+	if f.Limit <= 0 {
+		f.Limit = 20
+	}
+}
+
 func (f *ListFilter) FilterKey() string {
 	status, priority, assignee := "", "", ""
 	if f.Status != nil {

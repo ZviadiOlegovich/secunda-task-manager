@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/zoshc/secunda-task-manager/internal/transport/http/apierr"
 	"github.com/zoshc/secunda-task-manager/internal/services/user"
+	"github.com/zoshc/secunda-task-manager/internal/transport/http/apierr"
 	"github.com/zoshc/secunda-task-manager/internal/transport/http/handler/model"
 	"github.com/zoshc/secunda-task-manager/internal/transport/http/router"
 )
