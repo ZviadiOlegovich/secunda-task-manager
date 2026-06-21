@@ -35,10 +35,10 @@ var (
 func Metrics() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		start := time.Now()
+		method := c.Method()
 		err := c.Next()
 		duration := time.Since(start).Seconds()
 
-		method := c.Method()
 		path := c.Route().Path
 		if path == "" {
 			path = c.Path()
