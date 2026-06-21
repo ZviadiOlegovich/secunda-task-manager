@@ -13,10 +13,10 @@ import (
 const taskCacheTTL = 5 * time.Minute
 
 type TaskCache struct {
-	rdb *redis.Client
+	rdb *Client
 }
 
-func NewTaskCache(rdb *redis.Client) *TaskCache {
+func NewTaskCache(rdb *Client) *TaskCache {
 	return &TaskCache{rdb: rdb}
 }
 

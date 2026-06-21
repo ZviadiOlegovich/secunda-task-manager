@@ -12,7 +12,7 @@ import (
 func newTestCache(t *testing.T) *TaskCache {
 	t.Helper()
 	mr := miniredis.RunT(t)
-	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	rdb := &Client{redis.NewClient(&redis.Options{Addr: mr.Addr()})}
 	return NewTaskCache(rdb)
 }
 

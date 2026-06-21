@@ -6,14 +6,14 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/redis/go-redis/v9"
+	"github.com/zoshc/secunda-task-manager/internal/cache"
 )
 
 type RateLimiter struct {
-	rdb *redis.Client
+	rdb *cache.Client
 }
 
-func NewRateLimiter(rdb *redis.Client) *RateLimiter {
+func NewRateLimiter(rdb *cache.Client) *RateLimiter {
 	return &RateLimiter{rdb: rdb}
 }
 

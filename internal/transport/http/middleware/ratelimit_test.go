@@ -8,16 +8,17 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/gofiber/fiber/v2"
 	"github.com/redis/go-redis/v9"
+	"github.com/zoshc/secunda-task-manager/internal/cache"
 )
 
 func newTestRateLimiter(t *testing.T) *RateLimiter {
 	t.Helper()
 	mr := miniredis.RunT(t)
-	rdb := redis.NewClient(&redis.Options{
+	rdb := &cache.Client{Client: redis.NewClient(&redis.Options{
 		Addr:        mr.Addr(),
 		DialTimeout: 100 * time.Millisecond,
 		MaxRetries:  0,
-	})
+	})}
 	return NewRateLimiter(rdb)
 }
 

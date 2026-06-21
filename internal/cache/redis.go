@@ -9,8 +9,16 @@ import (
 	"github.com/zoshc/secunda-task-manager/internal/config"
 )
 
-func NewRedis(cfg config.RedisConfig) (*redis.Client, error) {
-	client := redis.NewClient(&redis.Options{
+type Client struct {
+	*redis.Client
+}
+
+func (c *Client) PingContext(ctx context.Context) error {
+	return c.Ping(ctx).Err()
+}
+
+func NewRedis(cfg config.RedisConfig) (*Client, error) {
+	rdb := redis.NewClient(&redis.Options{
 		Addr:     fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
 		Password: cfg.Password,
 		DB:       cfg.DB,
@@ -20,9 +28,9 @@ func NewRedis(cfg config.RedisConfig) (*redis.Client, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if err := client.Ping(ctx).Err(); err != nil {
+	if err := rdb.Ping(ctx).Err(); err != nil {
 		return nil, fmt.Errorf("ping redis: %w", err)
 	}
 
-	return client, nil
+	return &Client{rdb}, nil
 }
