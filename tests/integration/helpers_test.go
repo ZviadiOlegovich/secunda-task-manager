@@ -13,13 +13,11 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/golang-migrate/migrate/v4"
-	_ "github.com/golang-migrate/migrate/v4/database/mysql"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
+	"github.com/zoshc/secunda-task-manager/internal/repository"
 )
 
 var (
@@ -68,17 +66,6 @@ func run(m *testing.M) int {
 
 	dsn := fmt.Sprintf("root:root@tcp(%s:%s)/testdb?parseTime=true&multiStatements=true", host, port.Port())
 
-	mg, err := migrate.New("file://../../migrations", "mysql://"+dsn)
-	if err != nil {
-		log.Printf("create migrate: %v", err)
-		return 1
-	}
-	defer mg.Close()
-	if err := mg.Up(); err != nil && err != migrate.ErrNoChange {
-		log.Printf("migrate up: %v", err)
-		return 1
-	}
-
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		log.Printf("open db: %v", err)
@@ -88,6 +75,11 @@ func run(m *testing.M) int {
 
 	if err := db.PingContext(apiCtx); err != nil {
 		log.Printf("ping db: %v", err)
+		return 1
+	}
+
+	if err := repository.RunMigrations(db, "../../migrations"); err != nil {
+		log.Printf("run migrations: %v", err)
 		return 1
 	}
 

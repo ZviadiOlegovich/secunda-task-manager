@@ -40,7 +40,12 @@ func NewMySQL(cfg config.MySQLConfig) (*sql.DB, error) {
 }
 
 func RunMigrations(db *sql.DB, path string) error {
-	driver, err := mysqlmigrate.WithInstance(db, &mysqlmigrate.Config{})
+	conn, err := db.Conn(context.Background())
+	if err != nil {
+		return fmt.Errorf("acquire migration conn: %w", err)
+	}
+
+	driver, err := mysqlmigrate.WithConnection(context.Background(), conn, &mysqlmigrate.Config{})
 	if err != nil {
 		return fmt.Errorf("create migrate driver: %w", err)
 	}
