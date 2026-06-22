@@ -18,7 +18,7 @@ func New(repo Repository, teamRepo TeamRepository) *Service {
 }
 
 func (s *Service) CreateTask(ctx context.Context, create CreateTaskInput) (int64, error) {
-	logger := zerolog.Ctx(ctx)
+	logger := zerolog.Ctx(ctx).With().Int64("user_id", create.CreatedBy).Logger()
 
 	create.applyDefaults()
 	if err := create.validate(); err != nil {
@@ -54,7 +54,7 @@ func (s *Service) CreateTask(ctx context.Context, create CreateTaskInput) (int64
 }
 
 func (s *Service) UpdateTask(ctx context.Context, update UpdateTaskInput) error {
-	logger := zerolog.Ctx(ctx)
+	logger := zerolog.Ctx(ctx).With().Int64("user_id", update.UpdatedBy).Logger()
 
 	update.applyDefaults()
 	if err := update.validate(); err != nil {
@@ -100,8 +100,52 @@ func (s *Service) GetTaskHistory(ctx context.Context, taskID int64) ([]HistoryRe
 	return records, nil
 }
 
-func (s *Service) ListTasks(ctx context.Context, filter ListFilter) ([]*Task, error) {
+func (s *Service) AddComment(ctx context.Context, input CreateCommentInput) (int64, error) {
+	logger := zerolog.Ctx(ctx).With().Int64("user_id", input.UserID).Logger()
+
+	if err := input.validate(); err != nil {
+		return 0, err
+	}
+
+	t, err := s.repo.GetByID(ctx, input.TaskID)
+	if err != nil {
+		logger.Error().Err(err).Msg("get task for comment")
+		return 0, err
+	}
+
+	if err := s.teamRepo.AreMembersOf(ctx, t.TeamID, []int64{input.UserID}); err != nil {
+		if errors.Is(err, errs.ErrNotFound) {
+			return 0, ErrNotMember
+		}
+		logger.Error().Err(err).Msg("check membership for comment")
+		return 0, err
+	}
+
+	id, err := s.repo.CreateComment(ctx, &Comment{
+		TaskID:  input.TaskID,
+		UserID:  input.UserID,
+		Content: input.Content,
+	})
+	if err != nil {
+		logger.Error().Err(err).Msg("create comment")
+		return 0, err
+	}
+	return id, nil
+}
+
+func (s *Service) ListComments(ctx context.Context, taskID int64) ([]Comment, error) {
 	logger := zerolog.Ctx(ctx)
+
+	comments, err := s.repo.ListComments(ctx, taskID)
+	if err != nil {
+		logger.Error().Err(err).Msg("list comments")
+		return nil, err
+	}
+	return comments, nil
+}
+
+func (s *Service) ListTasks(ctx context.Context, filter ListFilter) ([]*Task, error) {
+	logger := zerolog.Ctx(ctx).With().Int64("user_id", filter.RequestedBy).Logger()
 
 	filter.normalize()
 	if err := filter.validate(); err != nil {

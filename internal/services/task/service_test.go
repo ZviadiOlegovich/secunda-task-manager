@@ -14,6 +14,8 @@ type mockRepo struct {
 	updateWithHistoryFn func(ctx context.Context, task *Task, history []TaskHistoryEntry) error
 	listFn              func(ctx context.Context, filter ListFilter) ([]*Task, error)
 	listHistoryFn       func(ctx context.Context, taskID int64) ([]HistoryRecord, error)
+	createCommentFn     func(ctx context.Context, comment *Comment) (int64, error)
+	listCommentsFn      func(ctx context.Context, taskID int64) ([]Comment, error)
 }
 
 func (m *mockRepo) Create(ctx context.Context, t *Task) (int64, error) {
@@ -34,6 +36,20 @@ func (m *mockRepo) List(ctx context.Context, f ListFilter) ([]*Task, error) {
 
 func (m *mockRepo) ListHistory(ctx context.Context, taskID int64) ([]HistoryRecord, error) {
 	return m.listHistoryFn(ctx, taskID)
+}
+
+func (m *mockRepo) CreateComment(ctx context.Context, c *Comment) (int64, error) {
+	if m.createCommentFn != nil {
+		return m.createCommentFn(ctx, c)
+	}
+	return 1, nil
+}
+
+func (m *mockRepo) ListComments(ctx context.Context, taskID int64) ([]Comment, error) {
+	if m.listCommentsFn != nil {
+		return m.listCommentsFn(ctx, taskID)
+	}
+	return nil, nil
 }
 
 type mockTeamRepo struct {
@@ -233,7 +249,7 @@ func TestService_CreateTask(t *testing.T) {
 
 func TestService_GetTaskHistory(t *testing.T) {
 	records := []HistoryRecord{
-		{ID: 1, TaskID: 10, UserID: 1, Field: "title", OldValue: nil, NewValue: strPtr("new")},
+		{ID: 1, TaskID: 10, UserID: 1, Field: "title", OldValue: nil, NewValue: func(s string) *string { return &s }("new")},
 	}
 
 	tests := []struct {
@@ -275,7 +291,125 @@ func TestService_GetTaskHistory(t *testing.T) {
 	}
 }
 
-func strPtr(s string) *string { return &s }
+func TestService_AddComment(t *testing.T) {
+	taskWithTeam := &Task{ID: 10, TeamID: 5, Title: "task", Status: StatusTodo, Priority: PriorityMedium, CreatedBy: 1}
+
+	okGetByID := func(_ context.Context, _ int64) (*Task, error) { return taskWithTeam, nil }
+
+	tests := []struct {
+		name     string
+		input    CreateCommentInput
+		repo     Repository
+		teamRepo TeamRepository
+		wantID   bool
+		wantErr  error
+	}{
+		{
+			name:  "success",
+			input: CreateCommentInput{TaskID: 10, UserID: 1, Content: "looks good"},
+			repo: &mockRepo{
+				getByIDFn: okGetByID,
+				createCommentFn: func(_ context.Context, c *Comment) (int64, error) {
+					return 42, nil
+				},
+			},
+			teamRepo: memberTeamRepo,
+			wantID:   true,
+		},
+		{
+			name:     "empty content",
+			input:    CreateCommentInput{TaskID: 10, UserID: 1, Content: ""},
+			repo:     &mockRepo{},
+			teamRepo: memberTeamRepo,
+			wantErr:  ErrEmptyComment,
+		},
+		{
+			name:     "whitespace-only content",
+			input:    CreateCommentInput{TaskID: 10, UserID: 1, Content: "   "},
+			repo:     &mockRepo{},
+			teamRepo: memberTeamRepo,
+			wantErr:  ErrEmptyComment,
+		},
+		{
+			name:  "task not found",
+			input: CreateCommentInput{TaskID: 99, UserID: 1, Content: "hi"},
+			repo: &mockRepo{
+				getByIDFn: func(_ context.Context, _ int64) (*Task, error) { return nil, errs.ErrNotFound },
+			},
+			teamRepo: memberTeamRepo,
+			wantErr:  errs.ErrNotFound,
+		},
+		{
+			name:  "get task repo error",
+			input: CreateCommentInput{TaskID: 10, UserID: 1, Content: "hi"},
+			repo: &mockRepo{
+				getByIDFn: func(_ context.Context, _ int64) (*Task, error) { return nil, errDB },
+			},
+			teamRepo: memberTeamRepo,
+			wantErr:  errDB,
+		},
+		{
+			name:  "user not a member of task team",
+			input: CreateCommentInput{TaskID: 10, UserID: 7, Content: "hi"},
+			repo: &mockRepo{
+				getByIDFn: okGetByID,
+			},
+			teamRepo: notMemberTeamRepo,
+			wantErr:  ErrNotMember,
+		},
+		{
+			name:  "membership check verifies task team_id",
+			input: CreateCommentInput{TaskID: 10, UserID: 1, Content: "hi"},
+			repo: &mockRepo{
+				getByIDFn: okGetByID,
+			},
+			teamRepo: &mockTeamRepo{
+				areMembersOfFn: func(_ context.Context, teamID int64, _ []int64) error {
+					if teamID != taskWithTeam.TeamID {
+						return errors.New("wrong team_id passed")
+					}
+					return nil
+				},
+			},
+			wantID: true,
+		},
+		{
+			name:  "membership check repo error",
+			input: CreateCommentInput{TaskID: 10, UserID: 1, Content: "hi"},
+			repo: &mockRepo{
+				getByIDFn: okGetByID,
+			},
+			teamRepo: &mockTeamRepo{
+				areMembersOfFn: func(_ context.Context, _ int64, _ []int64) error { return errDB },
+			},
+			wantErr: errDB,
+		},
+		{
+			name:  "create comment repo error",
+			input: CreateCommentInput{TaskID: 10, UserID: 1, Content: "hi"},
+			repo: &mockRepo{
+				getByIDFn:       okGetByID,
+				createCommentFn: func(_ context.Context, _ *Comment) (int64, error) { return 0, errDB },
+			},
+			teamRepo: memberTeamRepo,
+			wantErr:  errDB,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := New(tt.repo, tt.teamRepo)
+			id, err := svc.AddComment(context.Background(), tt.input)
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("want err %v, got %v", tt.wantErr, err)
+			}
+			if tt.wantID && id <= 0 {
+				t.Error("expected positive id, got 0")
+			}
+		})
+	}
+}
+
 
 func taskForUpdate(createdBy int64) *Task {
 	return &Task{ID: 10, TeamID: 1, Title: "old", Status: StatusTodo, Priority: PriorityMedium, CreatedBy: createdBy}

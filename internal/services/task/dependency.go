@@ -8,6 +8,8 @@ type Repository interface {
 	UpdateWithHistory(ctx context.Context, task *Task, history []TaskHistoryEntry) error
 	List(ctx context.Context, filter ListFilter) ([]*Task, error)
 	ListHistory(ctx context.Context, taskID int64) ([]HistoryRecord, error)
+	CreateComment(ctx context.Context, comment *Comment) (int64, error)
+	ListComments(ctx context.Context, taskID int64) ([]Comment, error)
 }
 
 type TeamRepository interface {

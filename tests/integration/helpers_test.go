@@ -94,6 +94,21 @@ type baseSuite struct {
 
 func (s *baseSuite) SetupSuite() {
 	s.db = testDB
+	s.truncateAll()
+}
+
+func (s *baseSuite) truncateAll() {
+	_, err := s.db.ExecContext(context.Background(), `
+		SET FOREIGN_KEY_CHECKS = 0;
+		TRUNCATE TABLE task_comments;
+		TRUNCATE TABLE task_history;
+		TRUNCATE TABLE tasks;
+		TRUNCATE TABLE team_members;
+		TRUNCATE TABLE teams;
+		TRUNCATE TABLE users;
+		SET FOREIGN_KEY_CHECKS = 1;
+	`)
+	s.Require().NoError(err)
 }
 
 func seedUser(t *testing.T, db *sql.DB) int64 {

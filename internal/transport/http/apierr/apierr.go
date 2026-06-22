@@ -45,7 +45,8 @@ func statusCode(err error) int {
 	case errors.Is(err, task.ErrInvalidTitle),
 		errors.Is(err, task.ErrInvalidStatus),
 		errors.Is(err, task.ErrInvalidPriority),
-		errors.Is(err, task.ErrInvalidEstimate):
+		errors.Is(err, task.ErrInvalidEstimate),
+		errors.Is(err, task.ErrEmptyComment):
 		return http.StatusBadRequest
 	default:
 		return http.StatusInternalServerError

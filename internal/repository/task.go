@@ -175,6 +175,38 @@ func (r *taskRepository) List(ctx context.Context, filter task.ListFilter) ([]*t
 	return tasks, nil
 }
 
+func (r *taskRepository) CreateComment(ctx context.Context, c *task.Comment) (int64, error) {
+	const q = `INSERT INTO task_comments (task_id, user_id, content) VALUES (?, ?, ?)`
+	result, err := r.db.ExecContext(ctx, q, c.TaskID, c.UserID, c.Content)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
+}
+
+func (r *taskRepository) ListComments(ctx context.Context, taskID int64) ([]task.Comment, error) {
+	const q = `SELECT c.id, c.task_id, c.user_id, u.name, c.content, c.created_at
+		FROM task_comments c
+		JOIN users u ON u.id = c.user_id
+		WHERE c.task_id = ? ORDER BY c.created_at ASC`
+
+	rows, err := r.db.QueryContext(ctx, q, taskID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var comments []task.Comment
+	for rows.Next() {
+		var c task.Comment
+		if err := rows.Scan(&c.ID, &c.TaskID, &c.UserID, &c.UserName, &c.Content, &c.CreatedAt); err != nil {
+			return nil, err
+		}
+		comments = append(comments, c)
+	}
+	return comments, rows.Err()
+}
+
 func (r *taskRepository) ListHistory(ctx context.Context, taskID int64) ([]task.HistoryRecord, error) {
 	const q = `SELECT h.id, h.task_id, h.user_id, u.name, h.field, h.old_value, h.new_value, h.created_at
 		FROM task_history h

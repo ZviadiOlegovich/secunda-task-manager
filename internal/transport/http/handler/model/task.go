@@ -66,6 +66,30 @@ func ToHistoryRecordResponse(h task.HistoryRecord) HistoryRecordResponse {
 	}
 }
 
+type CreateCommentRequest struct {
+	Content string `json:"content"`
+}
+
+type CommentResponse struct {
+	ID        int64     `json:"id"`
+	TaskID    int64     `json:"task_id"`
+	UserID    int64     `json:"user_id"`
+	UserName  string    `json:"user_name"`
+	Content   string    `json:"content"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func ToCommentResponse(c task.Comment) CommentResponse {
+	return CommentResponse{
+		ID:        c.ID,
+		TaskID:    c.TaskID,
+		UserID:    c.UserID,
+		UserName:  c.UserName,
+		Content:   c.Content,
+		CreatedAt: c.CreatedAt,
+	}
+}
+
 func ToTaskResponse(t *task.Task) TaskResponse {
 	return TaskResponse{
 		ID:          t.ID,

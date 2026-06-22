@@ -195,6 +195,28 @@ func (i *UpdateTaskInput) validate() error {
 	return nil
 }
 
+type Comment struct {
+	ID        int64
+	TaskID    int64
+	UserID    int64
+	UserName  string
+	Content   string
+	CreatedAt time.Time
+}
+
+type CreateCommentInput struct {
+	TaskID  int64
+	UserID  int64
+	Content string
+}
+
+func (i *CreateCommentInput) validate() error {
+	if strings.TrimSpace(i.Content) == "" {
+		return ErrEmptyComment
+	}
+	return nil
+}
+
 type TaskHistoryEntry struct {
 	TaskID   int64
 	UserID   int64
