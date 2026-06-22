@@ -7,6 +7,5 @@ CREATE TABLE IF NOT EXISTS task_comments (
 
     PRIMARY KEY (id),
     CONSTRAINT fk_task_comments_task FOREIGN KEY (task_id) REFERENCES tasks (id),
-    CONSTRAINT fk_task_comments_user FOREIGN KEY (user_id) REFERENCES users (id),
-    INDEX idx_task_comments_task_id (task_id)
+    CONSTRAINT fk_task_comments_user FOREIGN KEY (user_id) REFERENCES users (id)
 );
