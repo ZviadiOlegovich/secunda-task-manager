@@ -30,6 +30,7 @@ coverage.html
 *.test
 
 # Internal / not for reviewer
+.claude
 CLAUDE.md
 TASKS.md
 *.docx
